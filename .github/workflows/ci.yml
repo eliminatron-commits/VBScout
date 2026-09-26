@@ -1,0 +1,179 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  NODE_VERSION: '24'
+
+jobs:
+  checks:
+    name: Checks (config, i18n, offline and read-only policy, types)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Central configuration in sync (product.json)
+        run: npm run check:config
+      - name: Translations complete (i18n check)
+        run: npm run check:i18n
+      - name: Offline policy (CSP, capabilities, dependencies, sources)
+        run: npm run check:offline
+      - name: Read-only policy of the collector (with self-test)
+        run: npm run check:readonly
+      - name: Svelte / TypeScript
+        run: npm run check
+
+  linux:
+    name: Linux (development platform) – tests, read-only and network traces
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build dependencies (WebKitGTK for the app crate), strace
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev librsvg2-dev \
+            libayatana-appindicator3-dev xvfb strace dbus
+      - name: Rust toolchain (rust-toolchain.toml)
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustc --version
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Build frontend
+        run: npm run build
+
+      - name: Format
+        run: cargo fmt --all --check
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Tests (incl. read-only snapshot test, schema and corpus tests)
+        run: cargo test --workspace --locked
+      - name: Offline policy (resolved dependency graphs, Windows and Linux)
+        run: node scripts/check-offline.mjs --cargo
+
+      - name: Build collector (release)
+        run: cargo build --release --locked -p vbs-collector
+      - name: Read-only trace (strace, collector)
+        run: bash scripts/readonly/linux.sh target/release/vbs-collector tests/corpus readonly-out
+      - name: Network block test (collector)
+        run: |
+          bash scripts/nettest/linux.sh nettest-out -- target/release/vbs-collector \
+            --path "$PWD/tests/corpus" --out "$PWD/nettest-out/collector-scan.vbscout" --quiet
+
+      - name: Upload trace logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: traces-linux
+          path: |
+            readonly-out/
+            nettest-out/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  windows:
+    name: Windows x64 – build, tests, read-only and network traces
+    needs: checks
+    runs-on: windows-2025
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v7
+      - name: Rust toolchain (rust-toolchain.toml)
+        shell: bash
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustc --version
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Build frontend
+        run: npm run build
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Tests (incl. read-only snapshot test, schema and corpus tests)
+        run: cargo test --workspace --locked
+
+      - name: Build collector (release, static CRT)
+        run: cargo build --release --locked -p vbs-collector
+      - name: Build evaluation app (release)
+        run: npx tauri build --no-bundle
+      - name: Collector below 10 MB
+        run: node scripts/check-size.mjs target/release/vbs-collector.exe 10
+      - name: App program file size (information, limit 20 MB)
+        run: node scripts/check-size.mjs target/release/vbs-app.exe 20
+
+      - name: Read-only trace (ETW, collector)
+        shell: pwsh
+        run: ./scripts/readonly/windows.ps1 -Exe target\release\vbs-collector.exe -ScanPath tests\corpus -OutDir readonly-out
+      - name: Network block test (collector)
+        shell: pwsh
+        run: ./scripts/nettest/windows.ps1 -Exe target\release\vbs-collector.exe -Arguments '--path','tests\corpus','--out','nettest-out\collector-scan.vbscout','--quiet' -OutDir nettest-out
+
+      - name: App starts (smoke test)
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath target\release\vbs-app.exe -ArgumentList '--smoke-test=90' -PassThru
+          $null = $p.Handle
+          if (-not $p.WaitForExit(150000)) { $p.Kill(); throw 'smoke test timed out' }
+          if ($p.ExitCode -ne 0) { throw "smoke test failed with exit code $($p.ExitCode)" }
+          'SMOKE OK'
+      - name: Network block test (app)
+        shell: pwsh
+        run: ./scripts/nettest/windows.ps1 -Exe target\release\vbs-app.exe -Arguments '--smoke-test=90' -WebView -OutDir nettest-out
+
+      - name: Collector runs without installation (full scan of this machine)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force collector-out | Out-Null
+          $p = Start-Process -FilePath target\release\vbs-collector.exe -ArgumentList '--out','collector-out' -PassThru -NoNewWindow
+          $null = $p.Handle
+          if (-not $p.WaitForExit(1800000)) { $p.Kill(); throw 'collector timed out' }
+          if ($p.ExitCode -ne 0) { throw "collector failed with exit code $($p.ExitCode)" }
+          Get-ChildItem collector-out | Format-Table Name, Length
+
+      - name: Upload trace logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: traces-windows
+          path: |
+            readonly-out/*.txt
+            readonly-out/*.log
+            nettest-out/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Upload programs (development builds, unsigned)
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-x64-dev
+          path: |
+            target/release/vbs-collector.exe
+            target/release/vbs-app.exe
+            collector-out/
+          retention-days: 14

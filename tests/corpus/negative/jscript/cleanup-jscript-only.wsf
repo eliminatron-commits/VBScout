@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<job id="cleanup">
+  <script language="JScript">
+    var fso = new ActiveXObject("Scripting.FileSystemObject");
+    WScript.Echo(fso.GetTempName());
+  </script>
+</job>

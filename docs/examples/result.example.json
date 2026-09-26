@@ -1,0 +1,104 @@
+{
+  "format": "application/vnd.vbscout.result+zip",
+  "schemaVersion": 1,
+  "scanId": "0b9c3e0e-5a0c-4f67-9f55-3d1f2e8a7c11",
+  "generator": {
+    "product": "VBScout",
+    "component": "collector",
+    "version": "0.1.0",
+    "rulesAsOf": "2026-09-26",
+    "platform": "windows"
+  },
+  "startedAt": "2026-09-26T08:15:00.000Z",
+  "finishedAt": "2026-09-26T08:21:42.512Z",
+  "machine": {
+    "hostname": "FS-01",
+    "fqdn": "fs-01.corp.example",
+    "domain": "corp.example",
+    "machineId": "5d41402abc4b2a76b9719d911017c5925d41402abc4b2a76b9719d911017c592",
+    "os": {
+      "family": "windows",
+      "name": "Windows Server 2022 Standard",
+      "version": "10.0.20348.4171",
+      "build": 20348,
+      "displayVersion": "21H2",
+      "edition": "ServerStandard",
+      "productType": "server",
+      "architecture": "x64"
+    }
+  },
+  "scope": {
+    "localDrives": true,
+    "paths": [],
+    "networkPaths": ["\\\\corp.example\\NETLOGON"],
+    "systemSources": true
+  },
+  "coverage": {
+    "mode": "full",
+    "elevated": true,
+    "limitations": [],
+    "sources": [
+      {
+        "source": "files.localDrives",
+        "status": "partial",
+        "reason": "unreadableItems",
+        "roots": ["C:\\", "D:\\"],
+        "entries": 412803,
+        "inspected": 57,
+        "errors": 2,
+        "skipped": 14,
+        "errorSamples": ["C:\\System Volume Information (Access is denied. (os error 5))"],
+        "durationMs": 381204
+      },
+      {
+        "source": "files.networkPaths",
+        "status": "complete",
+        "roots": ["\\\\corp.example\\NETLOGON"],
+        "entries": 31,
+        "inspected": 4,
+        "durationMs": 822
+      },
+      {
+        "source": "eventLog.application",
+        "status": "complete",
+        "entries": 12,
+        "inspected": 12,
+        "durationMs": 95,
+        "timeRange": { "from": "2026-08-30T02:11:09Z", "to": "2026-09-26T08:14:51Z" }
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "f1",
+      "rule": "VBS-101",
+      "kind": "scriptFile",
+      "classification": "breaks",
+      "status": "detected",
+      "activation": "automatic",
+      "location": { "type": "file", "path": "D:\\Scripts\\nightly-backup.vbs" },
+      "file": {
+        "size": 2048,
+        "modifiedAt": "2019-03-02T17:40:00Z",
+        "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+        "network": false
+      },
+      "evidence": [
+        { "line": 12, "text": "Set fso = CreateObject(\"Scripting.FileSystemObject\")" },
+        { "line": 31, "text": "strPwd = \"********\"", "masked": true }
+      ],
+      "details": { "engine": "VBScript" }
+    },
+    {
+      "id": "f2",
+      "rule": "VBS-100",
+      "kind": "scriptFile",
+      "classification": "review",
+      "status": "notCheckable",
+      "reason": "cloudPlaceholder",
+      "activation": "dormant",
+      "location": { "type": "file", "path": "C:\\Users\\a.meyer\\OneDrive\\Tools\\export.vbs" },
+      "file": { "size": 4096, "network": false }
+    }
+  ]
+}

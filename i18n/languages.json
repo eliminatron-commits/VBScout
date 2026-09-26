@@ -1,0 +1,13 @@
+{
+  "source": "en",
+  "languages": {
+    "en": { "reviewed": true },
+    "de": { "reviewed": true },
+    "fr": { "reviewed": false },
+    "es": { "reviewed": false },
+    "it": { "reviewed": false },
+    "nl": { "reviewed": false },
+    "pl": { "reviewed": false },
+    "pt-BR": { "reviewed": false }
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "name": "vbs-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "license": "SEE LICENSE IN LICENSE",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "tauri": "tauri",
+    "check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
+    "check:config": "node scripts/sync-config.mjs --check",
+    "check:i18n": "node scripts/check-i18n.mjs",
+    "check:offline": "node scripts/check-offline.mjs",
+    "check:readonly": "node scripts/check-readonly.mjs --self-test && node scripts/check-readonly.mjs",
+    "check:all": "npm run check:config && npm run check:i18n && npm run check:offline && npm run check:readonly && npm run check",
+    "sync:config": "node scripts/sync-config.mjs"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.11.1"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@tauri-apps/cli": "^2.11.5",
+    "@tsconfig/svelte": "^5.0.8",
+    "svelte": "^5.57.1",
+    "svelte-check": "^4.7.6",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.1"
+  }
+}

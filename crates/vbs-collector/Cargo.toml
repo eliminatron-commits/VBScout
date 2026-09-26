@@ -1,0 +1,46 @@
+[package]
+name = "vbs-collector"
+description = "Portable, read-only command-line collector: scans one machine for VBScript dependencies"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "vbs-collector"
+path = "src/main.rs"
+
+[dependencies]
+lexopt.workspace = true
+sha2.workspace = true
+time.workspace = true
+uuid.workspace = true
+vbs-config.workspace = true
+vbs-core.workspace = true
+vbs-i18n.workspace = true
+
+# Read-only Win32 APIs only – scripts/check-readonly.mjs lists what may be used.
+[target.'cfg(windows)'.dependencies]
+windows-sys = { workspace = true, features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_Storage_FileSystem",
+  "Win32_System_Registry",
+  "Win32_System_SystemInformation",
+  "Win32_System_Threading",
+] }
+
+[dev-dependencies]
+jsonschema.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+vbs-evaluation.workspace = true
+zip.workspace = true
+
+[lints]
+workspace = true

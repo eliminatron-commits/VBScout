@@ -1,0 +1,31 @@
+[package]
+name = "vbs-app"
+description = "Evaluation desktop application (Tauri 2 shell)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[build-dependencies]
+tauri-build = { version = "2.6", features = [] }
+
+[dependencies]
+rfd.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sys-locale.workspace = true
+# No HTTP, updater, websocket, upload, shell or opener plugins – ever (see CLAUDE.md).
+tauri = { version = "2.11", features = [] }
+time.workspace = true
+uuid.workspace = true
+vbs-config.workspace = true
+vbs-core.workspace = true
+vbs-evaluation.workspace = true
+vbs-i18n.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

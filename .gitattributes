@@ -1,0 +1,8 @@
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.icns binary
+*.vbscout binary
+# The test corpus keeps its bytes exactly as written: Windows scripts use CRLF,
+# Office/MSI/shortcut files are binary, and the detectors must see the originals.
+tests/corpus/** -text

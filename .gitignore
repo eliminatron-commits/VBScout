@@ -1,0 +1,28 @@
+# Build output
+/target/
+/dist/
+/node_modules/
+/src-tauri/gen/
+
+# Test and tool output
+/nettest-out/
+/readonly-out/
+/perf-out/
+*.log
+
+# Result files produced by local test runs (the corpus itself lives in tests/corpus/)
+/*.vbscout
+
+# Local secrets – never commit keys (the license signing key lives only as a Worker secret)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json

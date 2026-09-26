@@ -1,0 +1,5 @@
+# Windows builds link the C runtime statically: the collector must run as a
+# single file without installing the Visual C++ redistributable (Windows 10/11,
+# Server 2016–2025), and the evaluation app benefits the same way.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

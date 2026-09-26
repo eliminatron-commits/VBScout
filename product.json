@@ -1,0 +1,22 @@
+{
+  "name": "VBScout",
+  "identifier": "app.vbscout.desktop",
+  "website": "https://vbscout.example",
+  "supportEmail": "support@vbscout.example",
+  "translationsUrl": "https://github.com/eliminatron-commits/VBScout/tree/main/i18n",
+  "resultFile": {
+    "extension": "vbscout",
+    "mimeType": "application/vnd.vbscout.result+zip",
+    "legacyMimeTypes": []
+  },
+  "editions": {
+    "free": {
+      "maxMachines": 25
+    }
+  },
+  "pricing": {
+    "currency": "EUR",
+    "organization": { "amountMinor": 19900, "per": "organization", "billing": "oneTime" },
+    "msp": { "amountMinor": 59000, "per": "serviceProvider", "billing": "yearly" }
+  }
+}

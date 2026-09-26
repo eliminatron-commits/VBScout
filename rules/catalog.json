@@ -1,0 +1,35 @@
+{
+  "formatVersion": 1,
+  "asOf": "2026-09-26",
+  "sources": [
+    {
+      "id": "ms-deprecated-features",
+      "publisher": "Microsoft",
+      "title": "Deprecated features for Windows client",
+      "url": "https://learn.microsoft.com/en-us/windows/whats-new/deprecated-features",
+      "checked": "2026-09-26"
+    },
+    {
+      "id": "ms-vbscript-timeline",
+      "publisher": "Microsoft",
+      "title": "VBScript deprecation: Timelines and next steps (Windows IT Pro Blog)",
+      "url": "https://techcommunity.microsoft.com/blog/windows-itpro-blog/vbscript-deprecation-timelines-and-next-steps/4148301",
+      "published": "2024-05-22",
+      "checked": "2026-09-26"
+    }
+  ],
+  "rules": [
+    {
+      "id": "VBS-100",
+      "kind": "scriptFile",
+      "classification": "review",
+      "sources": ["ms-vbscript-timeline"]
+    },
+    {
+      "id": "VBS-101",
+      "kind": "scriptFile",
+      "classification": "breaks",
+      "sources": ["ms-deprecated-features", "ms-vbscript-timeline"]
+    }
+  ]
+}

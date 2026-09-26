@@ -1,0 +1,13 @@
+# Neither the collector nor the evaluation app may ever open a network connection
+# (see CLAUDE.md). These lints turn every direct use of the standard networking API
+# and of process spawning into an error. Read-only rules for the collector are
+# enforced by scripts/check-readonly.mjs.
+disallowed-types = [
+  { path = "std::net::TcpStream", reason = "VBScout never opens network connections" },
+  { path = "std::net::TcpListener", reason = "VBScout never opens network connections" },
+  { path = "std::net::UdpSocket", reason = "VBScout never opens network connections" },
+]
+disallowed-methods = [
+  { path = "std::net::ToSocketAddrs::to_socket_addrs", reason = "VBScout never resolves host names" },
+  { path = "std::process::Command::new", reason = "VBScout never starts other programs" },
+]

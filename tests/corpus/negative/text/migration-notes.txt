@@ -1,0 +1,4 @@
+Migration notes
+
+We replaced the old VBScript logon script with PowerShell in 2025.
+The old call was: cscript //nologo logon.vbs
