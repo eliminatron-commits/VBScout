@@ -1,0 +1,56 @@
+{
+  "channels": {
+    "Application": [
+      {
+        "recordId": 7,
+        "eventId": 4096,
+        "provider": "Microsoft-Windows-SomethingElse",
+        "time": "2026-09-01T08:00:00Z",
+        "data": {
+          "#1": "cscript.exe"
+        }
+      },
+      {
+        "recordId": 8,
+        "eventId": 1000,
+        "provider": "Application Error",
+        "time": "2026-09-02T08:00:00Z",
+        "data": {
+          "#1": "EXCEL.EXE"
+        }
+      }
+    ],
+    "Microsoft-Windows-Sysmon/Operational": [
+      {
+        "recordId": 1,
+        "eventId": 1,
+        "provider": "Microsoft-Windows-Sysmon",
+        "time": "2026-09-05T06:00:00Z",
+        "data": {
+          "Image": "C:\\Windows\\System32\\notepad.exe",
+          "CommandLine": "notepad.exe C:\\Scripts\\backup.vbs"
+        }
+      },
+      {
+        "recordId": 2,
+        "eventId": 1,
+        "provider": "Microsoft-Windows-Sysmon",
+        "time": "2026-09-05T06:01:00Z",
+        "data": {
+          "Image": "C:\\Windows\\System32\\cscript.exe",
+          "CommandLine": "cscript.exe //E:JScript C:\\Tools\\report.txt"
+        }
+      },
+      {
+        "recordId": 3,
+        "eventId": 7,
+        "provider": "Microsoft-Windows-Sysmon",
+        "time": "2026-09-05T06:02:00Z",
+        "data": {
+          "Image": "C:\\Windows\\System32\\cscript.exe",
+          "ImageLoaded": "C:\\Windows\\System32\\jscript.dll"
+        }
+      }
+    ]
+  }
+}

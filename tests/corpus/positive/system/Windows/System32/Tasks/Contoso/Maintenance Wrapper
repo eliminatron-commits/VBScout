@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <Triggers><CalendarTrigger><StartBoundary>2025-01-01T03:00:00</StartBoundary><ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay></CalendarTrigger></Triggers>
+  <Settings><Enabled>true</Enabled></Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>%SystemRoot%\System32\cmd.exe</Command>
+      <Arguments>/c "%SystemRoot%/Scripts/maintenance.cmd"</Arguments>
+    </Exec>
+  </Actions>
+</Task>

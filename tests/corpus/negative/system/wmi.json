@@ -1,0 +1,36 @@
+{
+  "namespaces": {
+    "ROOT\\subscription": {
+      "__EventFilter": [],
+      "__FilterToConsumerBinding": [],
+      "ActiveScriptEventConsumer": [
+        {
+          "path": "ActiveScriptEventConsumer.Name=\"JsCleanup\"",
+          "properties": {
+            "Name": "JsCleanup",
+            "ScriptingEngine": "JScript",
+            "ScriptText": "var fso = new ActiveXObject(\"Scripting.FileSystemObject\");"
+          }
+        }
+      ],
+      "CommandLineEventConsumer": [
+        {
+          "path": "CommandLineEventConsumer.Name=\"Ping\"",
+          "properties": {
+            "Name": "Ping",
+            "ExecutablePath": "C:\\Windows\\System32\\ping.exe",
+            "CommandLineTemplate": "ping.exe -n 1 localhost"
+          }
+        }
+      ],
+      "NTEventLogEventConsumer": [
+        {
+          "path": "NTEventLogEventConsumer.Name=\"SCM Event Log Consumer\"",
+          "properties": {
+            "Name": "SCM Event Log Consumer"
+          }
+        }
+      ]
+    }
+  }
+}

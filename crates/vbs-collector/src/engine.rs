@@ -68,8 +68,11 @@ pub fn scan(plan: &Plan, host: &Host, modules: &[Box<dyn Module>]) -> ScanResult
         }
     }
 
-    let file_modules: Vec<&dyn Module> =
-        modules.iter().map(AsRef::as_ref).filter(|module| !module.extensions().is_empty()).collect();
+    let file_modules: Vec<&dyn Module> = modules
+        .iter()
+        .map(AsRef::as_ref)
+        .filter(|module| !module.extensions().is_empty() || !module.file_names().is_empty())
+        .collect();
     let local_source = if plan.paths.is_empty() { SOURCE_LOCAL_DRIVES } else { SOURCE_PATHS };
     sources.push(walk_source(local_source, &plan.local_roots(host), false, &file_modules, plan, &mut findings));
     if !plan.network_paths.is_empty() {
@@ -116,6 +119,7 @@ fn run_system_part(
     let mut report = Report::new();
     let completed = panic::catch_unwind(AssertUnwindSafe(|| module.scan_system(system, &mut report))).is_ok();
     let declared = report.source_status().cloned();
+    let (roots, skipped, time_range) = (report.roots().to_vec(), report.skipped(), report.time_range());
     let (module_findings, counters) = report.into_parts();
     let (status, reason) = if !completed {
         (SourceStatus::Failed, Some("internalError".to_owned()))
@@ -131,7 +135,9 @@ fn run_system_part(
     if completed {
         findings.extend(module_findings);
     }
-    coverage(source, status, reason, Vec::new(), counters, 0, clock)
+    let mut entry = coverage(source, status, reason, roots, counters, skipped, clock);
+    entry.time_range = time_range;
+    entry
 }
 
 fn walk_source(

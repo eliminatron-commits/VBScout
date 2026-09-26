@@ -1,11 +1,15 @@
 //! Computer name, elevation, processor architecture and fixed drives – all
 //! through query-only Win32 calls.
 
-use std::path::PathBuf;
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 use std::ptr;
 
 use windows_sys::Win32::Foundation::{CloseHandle, HANDLE};
-use windows_sys::Win32::Security::{GetTokenInformation, TOKEN_ELEVATION, TOKEN_QUERY, TokenElevation};
+use windows_sys::Win32::Security::{
+    CheckTokenMembership, CreateWellKnownSid, GetTokenInformation, SECURITY_MAX_SID_SIZE, TOKEN_ELEVATION, TOKEN_QUERY,
+    TokenElevation, WinBuiltinAdministratorsSid,
+};
 use windows_sys::Win32::Storage::FileSystem::{GetDriveTypeW, GetLogicalDriveStringsW, QueryDosDeviceW};
 use windows_sys::Win32::System::SystemInformation::{
     ComputerNameDnsDomain, ComputerNameDnsFullyQualified, ComputerNameNetBIOS, GetComputerNameExW, GetNativeSystemInfo,
@@ -13,8 +17,55 @@ use windows_sys::Win32::System::SystemInformation::{
 };
 use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 
-/// `GetDriveTypeW` result for fixed disks.
+/// `GetDriveTypeW` results for fixed disks and network drives.
 const DRIVE_FIXED: u32 = 3;
+const DRIVE_REMOTE: u32 = 4;
+
+/// Machine-wide variables used in commands (`%SystemRoot%`, `%ProgramFiles%`, …), from the
+/// collector's own environment. User-specific ones (`%APPDATA%`, `%USERPROFILE%`) are left out:
+/// they belong to whoever runs the collector, not to the user of an entry.
+pub fn machine_variables() -> BTreeMap<String, String> {
+    const NAMES: [&str; 13] = [
+        "SystemRoot",
+        "windir",
+        "SystemDrive",
+        "ProgramData",
+        "ALLUSERSPROFILE",
+        "PUBLIC",
+        "ProgramFiles",
+        "ProgramFiles(x86)",
+        "ProgramW6432",
+        "CommonProgramFiles",
+        "CommonProgramFiles(x86)",
+        "CommonProgramW6432",
+        "ComSpec",
+    ];
+    NAMES
+        .iter()
+        .filter_map(|name| {
+            let value = std::env::var(name).ok().filter(|value| !value.is_empty())?;
+            Some((name.to_ascii_uppercase(), value))
+        })
+        .collect()
+}
+
+/// The drive letter of `C:\…` or `\\?\C:\…`.
+pub fn drive_letter(path: &Path) -> Option<char> {
+    let text = path.to_string_lossy();
+    let text = text.strip_prefix(r"\\?\").unwrap_or(&text);
+    let mut chars = text.chars();
+    match (chars.next(), chars.next()) {
+        (Some(letter), Some(':')) if letter.is_ascii_alphabetic() => Some(letter.to_ascii_uppercase()),
+        _ => None,
+    }
+}
+
+/// Whether a drive letter is mapped to a network share.
+pub fn is_remote_drive(letter: char) -> bool {
+    let root: Vec<u16> = format!("{letter}:\\").encode_utf16().chain(Some(0)).collect();
+    // SAFETY: `root` is a NUL-terminated root path such as "Z:\".
+    unsafe { GetDriveTypeW(root.as_ptr()) == DRIVE_REMOTE }
+}
 
 pub enum NameKind {
     NetBios,
@@ -44,8 +95,29 @@ pub fn computer_name(kind: NameKind) -> Option<String> {
     (!name.is_empty()).then_some(name)
 }
 
-/// Whether the process token is elevated (administrator or SYSTEM).
+/// Whether the collector has administrator rights: the Administrators group is enabled in its
+/// token (elevated administrator or SYSTEM). A filtered UAC token or a "basic user" token has the
+/// group only as deny-only and counts as not elevated.
 pub fn is_elevated() -> bool {
+    let mut sid = [0u8; SECURITY_MAX_SID_SIZE as usize];
+    let mut size = SECURITY_MAX_SID_SIZE;
+    // SAFETY: `sid` holds `size` bytes; no domain SID is needed for a built-in group.
+    if unsafe { CreateWellKnownSid(WinBuiltinAdministratorsSid, ptr::null_mut(), sid.as_mut_ptr().cast(), &mut size) }
+        == 0
+    {
+        return token_elevated();
+    }
+    let mut member = 0;
+    // SAFETY: a null token checks the calling thread's (or process') token; `sid` is a valid SID.
+    let ok = unsafe { CheckTokenMembership(ptr::null_mut(), sid.as_mut_ptr().cast(), &mut member) };
+    if ok == 0 {
+        return token_elevated();
+    }
+    member != 0
+}
+
+/// Fallback: the token's elevation flag.
+fn token_elevated() -> bool {
     let mut token: HANDLE = ptr::null_mut();
     // SAFETY: opens our own process token with query access only.
     if unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) } == 0 {

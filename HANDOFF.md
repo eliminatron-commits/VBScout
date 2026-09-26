@@ -1,37 +1,39 @@
 # Handoff — VBScout — 2026-09-26
 
 ## Stand
-Phase 1 (Fundament) ist abgeschlossen und als ein Commit `Phase 1: Fundament` (5e9a656) auf `claude/blissful-feynman-7hsvb9`
-gepusht. CI-Lauf 36253499363 war auf Linux und Windows vollständig grün (QK1 nur-lesend per Snapshot/strace/ETW, QK2 kein
-Netz für Sammler und App); Details und offene Punkte siehe PROGRESS.md. Der Kontrolllauf für 5e9a656 (Unterschied nur
-PROGRESS.md) lief bei Übergabe noch – kurz prüfen.
+Phase 2 (Sammler: Systemebene) ist abgeschlossen: ein Commit `Phase 2: Sammler: Systemebene` auf
+`claude/blissful-feynman-7hsvb9`; CI grün auf Linux, windows-2025 und windows-2022 (Tests, Korpus, ETW-/strace-Trace,
+Netztest, Nicht-Admin-Lauf, Systemtest mit echten Windows-Artefakten, Vollscan ohne interne Fehler) – Läufe und offene
+Punkte: PROGRESS.md. Beim Wiedereinstieg kurz prüfen, ob der Lauf des Abschluss-Commits grün ist.
 
 ## Offene Punkte (priorisiert)
-1. Phase 2/6 „Sammler: Systemebene“ beginnen – laut Protokoll zuerst Phase-Ankündigung + Modellzeile ausgeben und auf „weiter“ warten.
-2. Phase-2-Inhalt: Module in `crates/vbs-collector/src/modules/` (Skriptdateien, Aufrufe/LNK, Tasks, Richtlinien-/Anmeldeskripte/SYSVOL, Autostart, Dienste, WMI, MSI-CAs per CFB-Parser, Event-Log 4096 `VBScriptDeprecationAlert` + Sysmon 1/7), Zugangsdaten-Befund (VBS-9xx) aus `vbs_core::secrets`, Regeln + Quellen in `rules/catalog.json`, Texte in 8 Sprachen, Korpusfälle + `PENDING_KINDS` in `tests/corpus.rs` kürzen.
-3. Performance: Walk unter Windows mit FindFirstFileExW (LARGE_FETCH, Attribute aus Find-Daten) – Vollscan Runner 1,43 Mio. Einträge in 310 s.
-4. CI: zusätzlicher Windows-2022-Lauf, Server-2016-Kompatibilität dokumentieren (QK3).
+1. Phase 3/6 „Sammler: Office-Makros“ beginnen – laut Protokoll zuerst Ankündigung + Modellzeile, dann auf „weiter“ warten.
+2. Phase-3-Inhalt: Modul für Office-Dateien (OLE/CFB `vbaProject.bin`, OOXML-ZIP mit `vbaProject.bin`), VBA-Dekompression,
+   Regeln 6xx mit Quellen, Texte in 8 Sprachen, Korpusfälle; `PENDING_KINDS` in `tests/corpus.rs` leeren.
+3. Offene Punkte aus PROGRESS.md (4096-Format, Server 2016/Win10-Abnahme, Einordnung Windows-eigener Skripte in Phase 4).
 
 ## Wichtige Entscheidungen + Begründung
-- Rust-seitige Datei-Dialoge via `rfd` statt Tauri-dialog-Plugin → keine Frontend-Berechtigungen/fs-Plugin.
-- Registry nativ ohne `KEY_WOW64_64KEY` (64-bit): das Flag erzeugt `SetInformationKey`-Ereignisse, die der ETW-Test als Änderung wertet.
-- Sammler legt nie Ordner an, überschreibt nie, schreibt ohne `--out` nie unter `%SystemRoot%`.
-- Microsoft-Quellen vorerst per Suchauszug (Domains gesperrt); Direktprüfung vor Phase 5 – Nutzer hat zugestimmt.
-- Lizenz: Stepwright hat noch kein Ed25519/Worker → Entscheidung vor Phase 5.
+- Registry nur mit `KEY_READ`, ohne WOW64-Flags (32-Bit-Sicht über `SOFTWARE\WOW6432Node`): Flags setzen Handle-Tags,
+  die der ETW-Trace sonst als „Set“ zählt; Handle-Tags aus Windows' COM/WMI-Code weist der Trace separat aus.
+- Hives nicht angemeldeter Benutzer werden als Datei gelesen (`analysis/regf.rs`), nie geladen.
+- MSI-Zeichenketten ≥ 64 KiB: Layout (0, Referenzen), (Low, High) wie Windows/Wine; msitools schreibt es anders
+  (Fixture `long-strings.msi` wird deshalb konvertiert).
+- Nicht prüfbare Befunde tragen `readError` (Leserfehler, ≤ 120 Zeichen); gesperrte Dateien = `locked`.
 
 ## Bekannte Probleme / Blocker
-- learn/techcommunity/devblogs.microsoft.com in der Umgebung gesperrt (nicht blockierend).
-- PowerShell: Variablennamen case-insensitiv (Kollision `$webView`/`$WebView` war Fehlerursache); `pwsh` ist lokal installiert zum Testen.
+- learn/techcommunity/devblogs.microsoft.com und CI-Artefakt-Downloads (blob.core.windows.net) sind in der Umgebung
+  gesperrt: Quellen per Suchauszug, CI-Diagnose über die Job-Logs (GitHub-Releases und raw.githubusercontent.com gehen).
+- PowerShell-Fallen in den Windows-Skripten: Variablennamen case-insensitiv, Cmdlet-Ausgaben sind für COM in PSObject
+  verpackt (auspacken), `echo 0> datei` ist in cmd eine Umleitung (`(echo 0)> datei`).
 
 ## Relevante Pfade
 - `PROGRESS.md`, `CLAUDE.md` — Stand, Konventionen, verbotene Ansätze
-- `crates/vbs-core/src/module.rs`, `views.rs` — Modul-Schnittstelle, Read-only-Views
-- `crates/vbs-collector/src/{modules/mod.rs,walk.rs,platform/}` — Modulregistrierung, Walk, OS-Zugriffe
-- `rules/catalog.json`, `docs/research-notes.md` — Regeln/Quellen
-- `tests/corpus/`, `crates/vbs-collector/tests/corpus.rs` — Testsammlungen
-- `scripts/check-readonly.mjs`, `scripts/readonly/windows.ps1` — Nur-lesend-Nachweise
+- `crates/vbs-core/src/module.rs`, `views.rs` — Modul-Schnittstelle, Views
+- `crates/vbs-collector/src/modules/`, `analysis/` — Module und Leser (Vorlage für Office: `msi.rs` mit `cfb`)
+- `rules/catalog.json`, `i18n/`, `docs/research-notes.md` — Regeln, Texte, Quellen (Abschnitt „Office / VBA“)
+- `tests/corpus/`, `crates/vbs-collector/tests/corpus.rs`, `tests/corpus/make-binaries.py` — Testsammlungen
 
 ## Empfehlung für Fortsetzung
 - Modell: Opus 5.5
-- Effort: hoch – viele Windows-Spezialformate (Task-XML, LNK, MSI/CFB, EvtQuery, WMI) strikt nur lesend und belegte Einstufungen
-- Erster Schritt: CI-Status von 5e9a656 prüfen, dann Phase-2-Ankündigung ausgeben und auf „weiter“ warten
+- Effort: hoch – Binärformate (CFB, VBA-Kompression, OOXML) und Passwort-/Verschlüsselungsfälle strikt nur lesend
+- Erster Schritt: CI-Lauf des Abschluss-Commits prüfen, dann Phase-3-Ankündigung ausgeben und auf „weiter“ warten

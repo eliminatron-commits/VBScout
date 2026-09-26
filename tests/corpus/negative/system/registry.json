@@ -1,0 +1,128 @@
+{
+  "keys": [
+    {
+      "hive": "HKLM",
+      "path": "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run",
+      "values": {
+        "SecurityHealth": {
+          "expandSz": "%windir%\\system32\\SecurityHealthSystray.exe"
+        },
+        "Tray": {
+          "sz": "\"C:\\Program Files\\Contoso\\tray.exe\" /min"
+        }
+      }
+    },
+    {
+      "hive": "HKLM",
+      "view": "wow32",
+      "path": "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\RunOnce",
+      "values": {
+        "Cleanup": {
+          "sz": "powershell.exe -NoProfile -File C:\\Setup\\cleanup.ps1"
+        }
+      }
+    },
+    {
+      "hive": "HKLM",
+      "path": "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon",
+      "values": {
+        "Userinit": {
+          "sz": "C:\\Windows\\system32\\userinit.exe,"
+        },
+        "Shell": {
+          "sz": "explorer.exe"
+        }
+      }
+    },
+    {
+      "hive": "HKLM",
+      "path": "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\S-1-5-21-1004336348-1177238915-682003330-1002",
+      "values": {
+        "ProfileImagePath": {
+          "expandSz": "{root}/Users/bob"
+        }
+      }
+    },
+    {
+      "hive": "HKU",
+      "path": "S-1-5-21-1004336348-1177238915-682003330-1002\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run",
+      "values": {
+        "OneDrive": {
+          "sz": "\"C:\\Users\\bob\\AppData\\Local\\Microsoft\\OneDrive\\OneDrive.exe\" /background"
+        }
+      }
+    },
+    {
+      "hive": "HKLM",
+      "path": "SYSTEM\\CurrentControlSet\\Services\\Spooler",
+      "values": {
+        "Type": {
+          "dword": 272
+        },
+        "Start": {
+          "dword": 2
+        },
+        "ImagePath": {
+          "expandSz": "%SystemRoot%\\System32\\spoolsv.exe"
+        }
+      }
+    },
+    {
+      "hive": "HKLM",
+      "path": "SYSTEM\\CurrentControlSet\\Services\\OddDriver",
+      "values": {
+        "Type": {
+          "dword": 1
+        },
+        "Start": {
+          "dword": 3
+        },
+        "ImagePath": {
+          "expandSz": "\\SystemRoot\\System32\\drivers\\odd.vbs"
+        }
+      }
+    },
+    {
+      "hive": "HKLM",
+      "path": "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Group Policy\\Scripts\\Startup\\0",
+      "values": {
+        "FileSysPath": {
+          "sz": "C:\\Windows\\System32\\GroupPolicy\\Machine"
+        }
+      }
+    },
+    {
+      "hive": "HKLM",
+      "path": "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Group Policy\\Scripts\\Startup\\0\\0",
+      "values": {
+        "Script": {
+          "sz": "C:\\Tools\\inventory.exe"
+        },
+        "Parameters": {
+          "sz": "/quiet"
+        }
+      }
+    },
+    {
+      "hive": "HKLM",
+      "path": "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Installer\\UserData\\S-1-5-18\\Products\\D9C8B7A6F0E14A2B8C3D4E5F6A7B8C9D\\InstallProperties",
+      "values": {
+        "LocalPackage": {
+          "sz": "{root}/Windows/Installer/7c9e2d.msi"
+        },
+        "DisplayName": {
+          "sz": "JScript Tool"
+        }
+      }
+    },
+    {
+      "hive": "HKLM",
+      "path": "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\S-1-5-21-1004336348-1177238915-682003330-1004",
+      "values": {
+        "ProfileImagePath": {
+          "expandSz": "{root}/Users/dave"
+        }
+      }
+    }
+  ]
+}

@@ -36,6 +36,8 @@ jobs:
         run: npm run check:offline
       - name: Read-only policy of the collector (with self-test)
         run: npm run check:readonly
+      - name: Import check of the program file (self-test)
+        run: npm run check:imports
       - name: Svelte / TypeScript
         run: npm run check
 
@@ -72,6 +74,8 @@ jobs:
         run: cargo test --workspace --locked
       - name: Offline policy (resolved dependency graphs, Windows and Linux)
         run: node scripts/check-offline.mjs --cargo
+      - name: Scan performance (100,000 files, limit 10 minutes)
+        run: cargo test --release --locked -p vbs-collector --test performance -- --ignored --nocapture
 
       - name: Build collector (release)
         run: cargo build --release --locked -p vbs-collector
@@ -94,10 +98,15 @@ jobs:
           retention-days: 14
 
   windows:
-    name: Windows x64 – build, tests, read-only and network traces
+    name: Windows x64 (${{ matrix.os }}) – build, tests, traces, system test
     needs: checks
-    runs-on: windows-2025
-    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        # windows-2025 runs everything; windows-2022 checks the collector on the older server release.
+        os: [windows-2025, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
       - name: Rust toolchain (rust-toolchain.toml)
@@ -120,22 +129,49 @@ jobs:
         run: cargo test --workspace --locked
 
       - name: Build collector (release, static CRT)
+        id: collector
         run: cargo build --release --locked -p vbs-collector
       - name: Build evaluation app (release)
+        id: app
+        if: matrix.os == 'windows-2025'
         run: npx tauri build --no-bundle
+
+      # The checks below are independent of each other: each runs once its program is built, even
+      # if an earlier check failed, so one run reports all of them (the job fails if any fails).
       - name: Collector below 10 MB
+        if: ${{ !cancelled() && steps.collector.outcome == 'success' }}
         run: node scripts/check-size.mjs target/release/vbs-collector.exe 10
+      - name: Collector imports only Windows system libraries (no C runtime to install, no network)
+        if: ${{ !cancelled() && steps.collector.outcome == 'success' }}
+        run: node scripts/check-imports.mjs target/release/vbs-collector.exe --out collector-imports.txt
       - name: App program file size (information, limit 20 MB)
+        if: ${{ !cancelled() && steps.app.outcome == 'success' }}
         run: node scripts/check-size.mjs target/release/vbs-app.exe 20
+      - name: Scan performance (100,000 files, limit 10 minutes)
+        if: ${{ !cancelled() && steps.collector.outcome == 'success' }}
+        run: cargo test --release --locked -p vbs-collector --test performance -- --ignored --nocapture
 
       - name: Read-only trace (ETW, collector)
+        if: ${{ !cancelled() && steps.collector.outcome == 'success' }}
         shell: pwsh
         run: ./scripts/readonly/windows.ps1 -Exe target\release\vbs-collector.exe -ScanPath tests\corpus -OutDir readonly-out
       - name: Network block test (collector)
+        if: ${{ !cancelled() && steps.collector.outcome == 'success' }}
         shell: pwsh
         run: ./scripts/nettest/windows.ps1 -Exe target\release\vbs-collector.exe -Arguments '--path','tests\corpus','--out','nettest-out\collector-scan.vbscout','--quiet' -OutDir nettest-out
 
+      - name: Without administrator rights the scan is limited and says so
+        if: ${{ !cancelled() && steps.collector.outcome == 'success' }}
+        shell: pwsh
+        run: ./scripts/systemtest/nonadmin.ps1 -Exe target\release\vbs-collector.exe -ScanPath tests\corpus -OutDir nonadmin-out
+
+      - name: System test (dependencies created by Windows itself)
+        if: ${{ !cancelled() && steps.collector.outcome == 'success' }}
+        shell: pwsh
+        run: ./scripts/systemtest/windows.ps1 -Exe target\release\vbs-collector.exe -OutDir systemtest-out
+
       - name: App starts (smoke test)
+        if: ${{ !cancelled() && steps.app.outcome == 'success' }}
         shell: pwsh
         run: |
           $p = Start-Process -FilePath target\release\vbs-app.exe -ArgumentList '--smoke-test=90' -PassThru
@@ -144,10 +180,12 @@ jobs:
           if ($p.ExitCode -ne 0) { throw "smoke test failed with exit code $($p.ExitCode)" }
           'SMOKE OK'
       - name: Network block test (app)
+        if: ${{ !cancelled() && steps.app.outcome == 'success' }}
         shell: pwsh
         run: ./scripts/nettest/windows.ps1 -Exe target\release\vbs-app.exe -Arguments '--smoke-test=90' -WebView -OutDir nettest-out
 
       - name: Collector runs without installation (full scan of this machine)
+        if: ${{ !cancelled() && steps.collector.outcome == 'success' }}
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force collector-out | Out-Null
@@ -156,19 +194,43 @@ jobs:
           if (-not $p.WaitForExit(1800000)) { $p.Kill(); throw 'collector timed out' }
           if ($p.ExitCode -ne 0) { throw "collector failed with exit code $($p.ExitCode)" }
           Get-ChildItem collector-out | Format-Table Name, Length
+          # What a real Windows installation contains, and no module failure on it.
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $file = Get-ChildItem collector-out | Select-Object -First 1
+          $zip = [IO.Compression.ZipFile]::OpenRead($file.FullName)
+          $reader = [IO.StreamReader]::new($zip.GetEntry('result.json').Open())
+          $json = $reader.ReadToEnd(); $reader.Dispose(); $zip.Dispose()
+          Set-Content -LiteralPath collector-out\full-scan-result.json -Value $json -Encoding utf8
+          $result = $json | ConvertFrom-Json
+          $findings = @($result.findings)
+          "findings: $($findings.Count)"
+          $findings | Group-Object rule, status | Sort-Object Name | Format-Table Count, Name -AutoSize | Out-String -Width 200
+          $result.coverage.sources | Format-Table source, status, reason, entries, inspected, errors, skipped, durationMs -AutoSize | Out-String -Width 200
+          # Why items were not checkable (a real machine has locked and protected files; reader errors show as readError).
+          $notCheckable = @($findings | Where-Object { $_.status -eq 'notCheckable' })
+          $notCheckable | Group-Object rule, kind, reason | Sort-Object Name | Format-Table Count, Name -AutoSize | Out-String -Width 200
+          $notCheckable | Group-Object rule, reason | ForEach-Object { $_.Group | Select-Object -First 5 } |
+            ForEach-Object { '{0} {1} {2} {3} {4}' -f $_.rule, $_.reason, $_.location.path, $_.details.packagePath, $_.details.readError }
+          $internal = @($findings | Where-Object { $_.reason -eq 'internalError' })
+          if ($internal.Count) { $internal | ConvertTo-Json -Depth 6; throw "$($internal.Count) internal errors" }
 
       - name: Upload trace logs
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: traces-windows
+          name: traces-${{ matrix.os }}
           path: |
             readonly-out/*.txt
             readonly-out/*.log
             nettest-out/
+            nonadmin-out/*.txt
+            systemtest-out/
+            collector-out/full-scan-result.json
+            collector-imports.txt
           if-no-files-found: ignore
           retention-days: 14
       - name: Upload programs (development builds, unsigned)
+        if: matrix.os == 'windows-2025'
         uses: actions/upload-artifact@v7
         with:
           name: windows-x64-dev

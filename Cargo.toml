@@ -20,6 +20,8 @@ vbs-license = { path = "crates/vbs-license" }
 # External crates. Anything that can open network connections is forbidden
 # (checked by scripts/check-offline.mjs and clippy.toml); the collector must
 # additionally stay read-only (scripts/check-readonly.mjs).
+# OLE compound files (MSI packages; Office documents in phase 3), read through a read-only handle.
+cfb = "0.10"
 jsonschema = { version = "0.58", default-features = false }
 lexopt = "0.3"
 # Native file dialogs for the evaluation (no Tauri dialog/fs plugins, no frontend permissions).
@@ -32,6 +34,7 @@ tempfile = "3"
 thiserror = "2"
 time = { version = "0.3", features = ["serde", "formatting", "parsing", "macros"] }
 uuid = { version = "1", features = ["v4", "serde"] }
+windows = { version = "0.62", default-features = false }
 windows-sys = "0.61"
 zip = { version = "8", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 

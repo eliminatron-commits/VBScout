@@ -84,13 +84,17 @@ impl Queue {
 /// Walks `roots` with `threads` workers and lets `modules` inspect the candidate files.
 pub fn walk(roots: &[PathBuf], network: bool, modules: &[&dyn Module], threads: usize) -> WalkOutcome {
     let mut dispatch: HashMap<&str, Vec<usize>> = HashMap::new();
+    let mut by_name: HashMap<&str, Vec<usize>> = HashMap::new();
     for (index, module) in modules.iter().enumerate() {
         for extension in module.extensions() {
             dispatch.entry(extension).or_default().push(index);
         }
+        for name in module.file_names() {
+            by_name.entry(name).or_default().push(index);
+        }
     }
     let queue = Queue { state: Mutex::new((roots.to_vec(), 0)), changed: Condvar::new() };
-    let context = Context { dispatch: &dispatch, modules, network };
+    let context = Context { dispatch: &dispatch, by_name: &by_name, modules, network };
 
     let mut outcome = WalkOutcome::default();
     std::thread::scope(|scope| {
@@ -117,7 +121,10 @@ pub fn walk(roots: &[PathBuf], network: bool, modules: &[&dyn Module], threads: 
 }
 
 struct Context<'a> {
+    /// Modules by lower-case extension …
     dispatch: &'a HashMap<&'a str, Vec<usize>>,
+    /// … and by lower-case file name.
+    by_name: &'a HashMap<&'a str, Vec<usize>>,
     modules: &'a [&'a dyn Module],
     network: bool,
 }
@@ -170,8 +177,23 @@ impl Context<'_> {
         if !file_type.is_file() {
             return;
         }
-        let extension = extension_of(&entry.file_name());
-        let Some(interested) = self.dispatch.get(extension.as_str()) else { return };
+        let file_name = entry.file_name();
+        let extension = extension_of(&file_name);
+        let named = if self.by_name.is_empty() {
+            None
+        } else {
+            self.by_name.get(file_name.to_string_lossy().to_lowercase().as_str())
+        };
+        let interested: Vec<usize> = match (self.dispatch.get(extension.as_str()), named) {
+            (None, None) => return,
+            (Some(by_extension), None) => by_extension.clone(),
+            (None, Some(by_name)) => by_name.clone(),
+            (Some(by_extension), Some(by_name)) => {
+                let mut all = by_extension.clone();
+                all.extend(by_name.iter().filter(|index| !by_extension.contains(index)));
+                all
+            }
+        };
         let path = entry.path();
         let metadata = match entry.metadata() {
             Ok(metadata) => metadata,
@@ -194,7 +216,7 @@ impl Context<'_> {
             contents: OnceLock::new(),
             sha256: OnceLock::new(),
         };
-        for &index in interested {
+        for index in interested {
             let module = self.modules[index];
             let mut report = Report::new();
             let inspected = panic::catch_unwind(AssertUnwindSafe(|| module.inspect_file(&file, &mut report)));

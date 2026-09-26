@@ -1,0 +1,90 @@
+{
+  "channels": {
+    "Application": [
+      {
+        "recordId": 101,
+        "eventId": 1000,
+        "provider": "Application Error",
+        "time": "2026-08-01T07:00:00Z",
+        "data": {}
+      },
+      {
+        "recordId": 120,
+        "eventId": 4096,
+        "provider": "VBScriptDeprecationAlert",
+        "time": "2026-09-01T08:02:11Z",
+        "data": {
+          "ProcessName": "cscript.exe",
+          "ProcessTree": "cscript.exe;cmd.exe;userinit.exe;winlogon.exe",
+          "CallStack": "vbscript.dll+0x1a2b3"
+        }
+      },
+      {
+        "recordId": 131,
+        "eventId": 4096,
+        "provider": "VBScriptDeprecationAlert",
+        "time": "2026-09-02T08:01:57Z",
+        "data": {
+          "ProcessName": "cscript.exe",
+          "ProcessTree": "cscript.exe;cmd.exe;userinit.exe;winlogon.exe",
+          "CallStack": "vbscript.dll+0x1a2b3"
+        }
+      },
+      {
+        "recordId": 150,
+        "eventId": 4096,
+        "provider": "VBScriptDeprecationAlert",
+        "time": "2026-09-10T14:30:00Z",
+        "data": {
+          "#1": "EXCEL.EXE",
+          "#2": "EXCEL.EXE;explorer.exe",
+          "#3": "vbscript.dll+0x4c5d6"
+        }
+      }
+    ],
+    "Microsoft-Windows-Sysmon/Operational": [
+      {
+        "recordId": 5001,
+        "eventId": 1,
+        "provider": "Microsoft-Windows-Sysmon",
+        "time": "2026-09-05T06:00:00Z",
+        "data": {
+          "Image": "C:\\Windows\\System32\\cscript.exe",
+          "CommandLine": "cscript.exe //nologo C:\\Reports\\daily.vbs /pwd:\"S3cret!\"",
+          "ParentImage": "C:\\Windows\\System32\\svchost.exe"
+        }
+      },
+      {
+        "recordId": 5002,
+        "eventId": 1,
+        "provider": "Microsoft-Windows-Sysmon",
+        "time": "2026-09-06T06:00:00Z",
+        "data": {
+          "Image": "C:\\Windows\\System32\\notepad.exe",
+          "CommandLine": "notepad.exe C:\\Reports\\daily.vbs",
+          "ParentImage": "C:\\Windows\\explorer.exe"
+        }
+      },
+      {
+        "recordId": 5003,
+        "eventId": 7,
+        "provider": "Microsoft-Windows-Sysmon",
+        "time": "2026-09-07T09:15:00Z",
+        "data": {
+          "Image": "C:\\Program Files (x86)\\Contoso\\LegacyApp.exe",
+          "ImageLoaded": "C:\\Windows\\SysWOW64\\vbscript.dll"
+        }
+      },
+      {
+        "recordId": 5004,
+        "eventId": 7,
+        "provider": "Microsoft-Windows-Sysmon",
+        "time": "2026-09-07T09:16:00Z",
+        "data": {
+          "Image": "C:\\Program Files (x86)\\Contoso\\LegacyApp.exe",
+          "ImageLoaded": "C:\\Windows\\SysWOW64\\jscript9.dll"
+        }
+      }
+    ]
+  }
+}

@@ -25,6 +25,17 @@ pub enum SecretKind {
     UrlCredentials,
 }
 
+impl SecretKind {
+    /// The JSON name, e.g. for the `secretKinds` detail of a credential finding.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            SecretKind::Password => "password",
+            SecretKind::ConnectionString => "connectionString",
+            SecretKind::UrlCredentials => "urlCredentials",
+        }
+    }
+}
+
 /// A line with all recognised secrets replaced by [`MASK`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MaskedLine {

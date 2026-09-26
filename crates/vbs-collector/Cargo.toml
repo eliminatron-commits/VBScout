@@ -15,6 +15,7 @@ name = "vbs-collector"
 path = "src/main.rs"
 
 [dependencies]
+cfb.workspace = true
 lexopt.workspace = true
 sha2.workspace = true
 time.workspace = true
@@ -24,17 +25,28 @@ vbs-core.workspace = true
 vbs-i18n.workspace = true
 
 # Read-only Win32 APIs only – scripts/check-readonly.mjs lists what may be used.
+# `windows` (COM) is needed for WMI instance queries; everything else uses windows-sys.
 [target.'cfg(windows)'.dependencies]
+windows = { workspace = true, features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_System_Com",
+  "Win32_System_Ole",
+  "Win32_System_Variant",
+  "Win32_System_Wmi",
+] }
 windows-sys = { workspace = true, features = [
   "Win32_Foundation",
   "Win32_Security",
   "Win32_Storage_FileSystem",
+  "Win32_System_EventLog",
   "Win32_System_Registry",
   "Win32_System_SystemInformation",
   "Win32_System_Threading",
 ] }
 
 [dev-dependencies]
+cfb.workspace = true
 jsonschema.workspace = true
 serde.workspace = true
 serde_json.workspace = true

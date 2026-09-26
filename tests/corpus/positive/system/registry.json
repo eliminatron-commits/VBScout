@@ -1,0 +1,242 @@
+{
+  "keys": [
+    {
+      "hive": "HKLM",
+      "path": "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run",
+      "values": {
+        "LegacyAgent": {
+          "sz": "wscript.exe //B \"C:\\Program Files\\Contoso\\agent.vbs\""
+        },
+        "SecurityHealth": {
+          "expandSz": "%windir%\\system32\\SecurityHealthSystray.exe"
+        }
+      }
+    },
+    {
+      "hive": "HKLM",
+      "view": "wow32",
+      "path": "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\RunOnce",
+      "values": {
+        "FinishSetup": {
+          "sz": "mshta.exe \"C:\\Setup\\finish.hta\""
+        }
+      }
+    },
+    {
+      "hive": "HKLM",
+      "path": "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon",
+      "values": {
+        "Userinit": {
+          "sz": "C:\\Windows\\system32\\userinit.exe,cscript //B C:\\Login\\userinit-hook.vbs,"
+        },
+        "Shell": {
+          "sz": "explorer.exe"
+        }
+      }
+    },
+    {
+      "hive": "HKLM",
+      "path": "SOFTWARE\\Microsoft\\Active Setup\\Installed Components\\{7A3B9C1D-2E4F-4A5B-8C6D-9E0F1A2B3C4D}",
+      "values": {
+        "StubPath": {
+          "sz": "wscript.exe C:\\Setup\\per-user.vbs"
+        }
+      }
+    },
+    {
+      "hive": "HKU",
+      "path": "S-1-5-21-1004336348-1177238915-682003330-1001\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run",
+      "values": {
+        "Tray": {
+          "expandSz": "wscript \"%APPDATA%\\Tray\\tray.vbs\""
+        }
+      }
+    },
+    {
+      "hive": "HKU",
+      "path": "S-1-5-21-1004336348-1177238915-682003330-1001\\Environment",
+      "values": {
+        "UserInitMprLogonScript": {
+          "sz": "cscript //B C:\\Login\\legacy-logon.vbs"
+        }
+      }
+    },
+    {
+      "hive": "HKLM",
+      "path": "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\S-1-5-21-1004336348-1177238915-682003330-1001",
+      "values": {
+        "ProfileImagePath": {
+          "expandSz": "{root}/Users/alice"
+        }
+      }
+    },
+    {
+      "hive": "HKLM",
+      "path": "SYSTEM\\CurrentControlSet\\Services\\LegacyMonitor",
+      "values": {
+        "Type": {
+          "dword": 16
+        },
+        "Start": {
+          "dword": 2
+        },
+        "ImagePath": {
+          "expandSz": "C:\\Tools\\srvany.exe"
+        },
+        "DisplayName": {
+          "sz": "Legacy monitor"
+        }
+      }
+    },
+    {
+      "hive": "HKLM",
+      "path": "SYSTEM\\CurrentControlSet\\Services\\LegacyMonitor\\Parameters",
+      "values": {
+        "Application": {
+          "sz": "C:\\Windows\\System32\\cscript.exe"
+        },
+        "AppParameters": {
+          "sz": "//B C:\\Monitor\\watch.vbs"
+        }
+      }
+    },
+    {
+      "hive": "HKLM",
+      "path": "SYSTEM\\CurrentControlSet\\Services\\ContosoSync",
+      "values": {
+        "Type": {
+          "dword": 16
+        },
+        "Start": {
+          "dword": 3
+        },
+        "ImagePath": {
+          "expandSz": "\"C:\\Program Files\\Contoso\\sync.exe\""
+        },
+        "FailureCommand": {
+          "sz": "wscript C:\\Ops\\sync-alert.vbs"
+        }
+      }
+    },
+    {
+      "hive": "HKLM",
+      "path": "SYSTEM\\CurrentControlSet\\Services\\ContosoReport",
+      "values": {
+        "Type": {
+          "dword": 16
+        },
+        "Start": {
+          "dword": 4
+        },
+        "ImagePath": {
+          "expandSz": "\"C:\\Program Files\\Contoso\\report.exe\""
+        },
+        "FailureCommand": {
+          "sz": "wscript C:\\Ops\\menu.wsf"
+        }
+      }
+    },
+    {
+      "hive": "HKLM",
+      "path": "SYSTEM\\CurrentControlSet\\Services\\Spooler",
+      "values": {
+        "Type": {
+          "dword": 272
+        },
+        "Start": {
+          "dword": 2
+        },
+        "ImagePath": {
+          "expandSz": "%SystemRoot%\\System32\\spoolsv.exe"
+        }
+      }
+    },
+    {
+      "hive": "HKLM",
+      "path": "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Group Policy\\Scripts\\Startup\\0",
+      "values": {
+        "FileSysPath": {
+          "sz": "\\\\contoso.local\\SysVol\\contoso.local\\Policies\\{31B2F340-016D-11D2-945F-00C04FB984F9}\\Machine"
+        },
+        "DisplayName": {
+          "sz": "Default Domain Policy"
+        }
+      }
+    },
+    {
+      "hive": "HKLM",
+      "path": "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Group Policy\\Scripts\\Startup\\0\\0",
+      "values": {
+        "Script": {
+          "sz": "inventory.vbs"
+        },
+        "Parameters": {
+          "sz": "/silent"
+        }
+      }
+    },
+    {
+      "hive": "HKLM",
+      "path": "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Group Policy\\State\\S-1-5-21-1004336348-1177238915-682003330-1001\\Scripts\\Logon\\0",
+      "values": {
+        "FileSysPath": {
+          "sz": "\\\\contoso.local\\SysVol\\contoso.local\\Policies\\{6AC1786C-016F-11D2-945F-00C04FB984F9}\\User"
+        },
+        "DisplayName": {
+          "sz": "Logon scripts"
+        }
+      }
+    },
+    {
+      "hive": "HKLM",
+      "path": "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Group Policy\\State\\S-1-5-21-1004336348-1177238915-682003330-1001\\Scripts\\Logon\\0\\0",
+      "values": {
+        "Script": {
+          "sz": "drives.bat"
+        },
+        "Parameters": {
+          "sz": ""
+        }
+      }
+    },
+    {
+      "hive": "HKLM",
+      "path": "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Group Policy\\State\\S-1-5-21-1004336348-1177238915-682003330-1001\\Scripts\\Logon\\0\\1",
+      "values": {
+        "Script": {
+          "sz": "menu.wsf"
+        },
+        "Parameters": {
+          "sz": ""
+        }
+      }
+    },
+    {
+      "hive": "HKLM",
+      "path": "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Installer\\UserData\\S-1-5-18\\Products\\B7F2E1B0A4F3E2D1C1B2A39485766758\\InstallProperties",
+      "values": {
+        "LocalPackage": {
+          "sz": "{root}/Windows/Installer/2f4a1c.msi"
+        },
+        "DisplayName": {
+          "sz": "Helpdesk Agent"
+        },
+        "DisplayVersion": {
+          "sz": "3.2.0"
+        },
+        "Publisher": {
+          "sz": "Contoso"
+        }
+      }
+    },
+    {
+      "hive": "HKLM",
+      "path": "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\S-1-5-21-1004336348-1177238915-682003330-1003",
+      "values": {
+        "ProfileImagePath": {
+          "expandSz": "{root}/Users/carol"
+        }
+      }
+    }
+  ]
+}

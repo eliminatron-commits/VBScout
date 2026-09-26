@@ -19,8 +19,30 @@ expected.json    the expected findings of positive/ (path relative to positive/,
   test, which shrinks phase by phase (phase 2: system level, phase 3: Office macros) and must be
   empty at the end.
 
-System sources (registry, scheduled tasks, services, WMI, event logs) are tested with in-memory
-views (`vbs_core::views::MemoryRegistry` and friends) next to the module tests.
+Each collection is scanned like a machine: the file walk over the whole folder plus every system
+module over the collection's `system/` fixtures:
+
+```text
+system/registry.json        registry keys and values (HKLM/HKU, native or 32-bit view); "{root}" = this system/ folder
+system/events.json          event log records per channel (Application, Sysmon/Operational)
+system/wmi.json             WMI instances per namespace and class
+system/Windows/…            %SystemRoot%: task definitions (System32/Tasks), cached packages (Installer), scripts
+system/ProgramData/…        %ProgramData%: the all-users startup folder
+system/Users/<name>/…       profiles listed in registry.json (ProfileList): per-user startup folders;
+                            NTUSER.DAT = hive file of a user who is not logged on (carol, dave)
+```
+
+Binary and specially encoded files (`.lnk`, `.msi`, `.vbe`, `NTUSER.DAT`, UTF-16 files) are made by
+`make-binaries.py` with independent writers (pylnk3, msitools, hivex) – the readers are not tested only
+against files they wrote themselves. `installer/long-strings.msi` holds a string of more than
+128 KiB; its string pool entry is converted to the layout of Windows Installer (msitools writes it
+differently and cannot read it back itself) and checked with msitools' reader. The Windows CI job
+adds a system test with artefacts made by Windows itself (`scripts/systemtest/windows.ps1`).
+
+`expected.json` lists every finding of `positive/` (path, item, rule, status, target). To see what
+the collection yields after a change, run
+`cargo test -p vbs-collector --test corpus -- --ignored --nocapture print_positive_cases`, review
+the output and update the file.
 
 Rules for new cases:
 

@@ -36,7 +36,7 @@ shows a complete example. In short:
 | `rule` | rule ID from `rules/catalog.json`, e.g. `VBS-101` |
 | `kind` | finding type: `scriptFile`, `scriptInvocation`, `shortcut`, `scheduledTask`, `autostart`, `service`, `wmiSubscription`, `logonScript`, `msiCustomAction`, `eventLogUsage`, `officeMacro`, `hardcodedCredential` |
 | `classification` | `breaks` or `review`, copied from the rule catalog at scan time |
-| `status`, `reason` | `detected`, or `notCheckable` with a reason (`passwordProtected`, `accessDenied`, `locked`, `corrupt`, `unsupportedFormat`, `tooLarge`, `cloudPlaceholder`, `encrypted`, `internalError`) – nothing is skipped silently |
+| `status`, `reason` | `detected`, or `notCheckable` with a reason (`passwordProtected`, `accessDenied`, `locked`, `corrupt`, `unsupportedFormat`, `tooLarge`, `cloudPlaceholder`, `encrypted`, `networkLocation`, `internalError`) – nothing is skipped silently |
 | `activation` | how it runs – basis of the risk ranking: `automatic`, `logged`, `macro`, `installer`, `manual`, `dormant` |
 | `location` | `type` (`file`, `registry`, `scheduledTask`, `service`, `wmi`, `eventLog`, `msiPackage`), `path` and optional `item` (value, action, VBA module, custom action, …) |
 | `target` | script or program the finding runs, as written |
@@ -44,12 +44,48 @@ shows a complete example. In short:
 | `evidence` | at most 5 affected lines, each at most 240 characters, secrets masked (`********`, `masked: true`) |
 | `details` | small module-specific scalar values |
 
+### Coverage sources
+
+| Source | What it covers |
+|---|---|
+| `files.localDrives`, `files.paths`, `files.networkPaths` | the file walk: all fixed drives, `--path` folders, `--include-unc` paths |
+| `tasks.scheduled` | task definitions in `%SystemRoot%\System32\Tasks` (needs administrator rights) |
+| `autostart.entries` | Run/RunOnce keys (machine, both registry views, every user profile: loaded hives under `HKEY_USERS`, the hives of users who are not logged on read from their `NTUSER.DAT` file – never loaded), Winlogon, Active Setup, command processor AutoRun, startup folders of all users and profiles; `skipped` counts profiles whose hive file could not be read (`partial`, reason `userHivesNotRead`) |
+| `services.configuration` | services: image path, failure command, srvany/NSSM `Parameters\Application` |
+| `wmi.subscriptions` | permanent WMI consumers (`ActiveScriptEventConsumer`, `CommandLineEventConsumer`) and their bindings |
+| `policies.scripts` | Group Policy scripts as applied (registry, including the policy state of users who are not logged on and their hive files), `UserInitMprLogonScript`; `scripts.ini` files are found by the walk |
+| `installer.packages` | cached packages of installed products (`%SystemRoot%\Installer`, via the registry) |
+| `eventLog.vbscriptDeprecation` | Application log, event 4096 of `VBScriptDeprecationAlert`; `timeRange` = span of records available |
+| `eventLog.sysmon` | Sysmon log, events 1 and 7 (`unavailable`/`notInstalled` without Sysmon); `timeRange` as above |
+
+A source is `complete`, `partial` (reason, e.g. `notElevated`, `unreadableItems`, `userHivesNotRead`),
+`unavailable` or `failed`. System modules never read network paths: a script on a network path that a task or policy
+starts is reported as `notCheckable` with reason `networkLocation`.
+
+### Details (by finding type)
+
+| Type | Detail keys |
+|---|---|
+| all command-based types | `via` (`wscript`, `cscript`, `mshta`, `rundll32`, `direct`, `inline`, `script`), `calledScriptStarts` (when a called batch/PowerShell file starts VBScript) |
+| `scriptFile` | `encoded`, `vbscriptBlocks` |
+| `scriptInvocation` | `calls` (lines that start VBScript) |
+| `shortcut` | `workingDirectory`, `recentItem` |
+| `scheduledTask` | `enabled`, `triggers` |
+| `autostart` | `autostartType` (`run`, `runOnce`, `runOnceEx`, `policyRun`, `winlogon`, `windowsLoad`, `activeSetup`, `commandProcessor`, `startupFolder`, …), `offlineHive` (read from the hive file of a user who is not logged on) |
+| `service` | `startType`, `displayName` |
+| `wmiSubscription` | `consumerClass`, `scriptingEngine`, `bound`, `eventQuery` |
+| `logonScript` | `phase`, `policyName`, `offlineHive` |
+| `msiCustomAction` | `customActionType`, `scriptSource`, `scheduled`, `continueOnError`, `condition`, `productName`, `productVersion`, `publisher`, `packagePath` |
+| `eventLogUsage` | `events`, `firstSeen`, `lastSeen`, `processTree`, `image`, `parentImage` |
+| `hardcodedCredential` | `secrets` (count), `secretKinds` (`password`, `connectionString`, `urlCredentials`) |
+| `notCheckable` findings of read formats (`shortcut`, `msiCustomAction`) | `readError` – why the reader gave up, at most 120 characters (e.g. `link info`, `no string pool`, `not a regular file`); never file contents |
+
 ## Privacy and security invariants (enforced when writing)
 
 * Evidence contains only the affected lines, shortened, with control characters removed.
 * Passwords, connection-string passwords and URL credentials are masked before a line is stored – once when a module
-  reports it and again when the file is written. A masked secret is reported as a `hardcodedCredential` finding
-  without its value (phase 2).
+  reports it and again when the file is written. Secrets in a script, macro or command that uses VBScript are reported
+  as a `hardcodedCredential` finding (`VBS-901`) with the masked lines only, never the value.
 * No user names or profile paths beyond what a finding's location requires; the machine ID is pseudonymous.
 
 ## Limits (files are untrusted input)

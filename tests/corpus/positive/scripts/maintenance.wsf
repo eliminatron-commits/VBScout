@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<package>
+<job id="cleanup">
+  <script language="JScript">
+    var fso = new ActiveXObject("Scripting.FileSystemObject");
+  </script>
+  <script language="VBScript">
+    Set shell = CreateObject("WScript.Shell")
+    shell.Run "cleanmgr /sagerun:1", 0, True
+  </script>
+</job>
+</package>

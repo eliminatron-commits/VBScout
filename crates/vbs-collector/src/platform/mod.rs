@@ -63,6 +63,11 @@ pub fn skip_dir(path: &Path) -> bool {
     imp::skip_dir(path)
 }
 
+/// A network path or a path on a network drive (mapped drive letter): never read by system modules.
+pub fn is_network_location(path: &Path) -> bool {
+    is_network_path(path) || imp::is_remote_drive(path)
+}
+
 /// `\\server\share\…` (or `//server/share/…`), including the `\\?\UNC\` form.
 pub fn is_network_path(path: &Path) -> bool {
     let text = path.to_string_lossy();

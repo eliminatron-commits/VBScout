@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<component>
+<registration progid="Contoso.Helpdesk" classid="{2F1F6D5A-7C4B-4F2E-9A55-3E1B7C9D2A10}" version="1.0"/>
+<public><method name="Ticket"/></public>
+<script language="VBScript">
+<![CDATA[
+Function Ticket(text)
+  Set mail = CreateObject("CDO.Message")
+  Ticket = True
+End Function
+]]>
+</script>
+</component>

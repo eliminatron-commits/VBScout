@@ -16,20 +16,253 @@
       "url": "https://techcommunity.microsoft.com/blog/windows-itpro-blog/vbscript-deprecation-timelines-and-next-steps/4148301",
       "published": "2024-05-22",
       "checked": "2026-09-26"
+    },
+    {
+      "id": "ms-vbscript-detection",
+      "publisher": "Microsoft",
+      "title": "VBScript deprecation: Detection strategies for Windows (Windows IT Pro Blog)",
+      "url": "https://techcommunity.microsoft.com/blog/windows-itpro-blog/vbscript-deprecation-detection-strategies-for-windows/4414325",
+      "checked": "2026-09-26"
+    },
+    {
+      "id": "ms-vbscript-status-2026-09",
+      "publisher": "Microsoft",
+      "title": "Windows Insiders – State of VBScript deprecation – September 2026 (Microsoft Community Hub)",
+      "url": "https://techcommunity.microsoft.com/discussions/windowsserverinsiders/blog-windows-insiders---state-of-vbscript-deprecation---september-2026/4525768",
+      "checked": "2026-09-26"
+    },
+    {
+      "id": "ms-wscript-command",
+      "publisher": "Microsoft",
+      "title": "wscript (Windows commands)",
+      "url": "https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/wscript",
+      "checked": "2026-09-26"
+    },
+    {
+      "id": "ms-wsh-script-element",
+      "publisher": "Microsoft",
+      "title": "<script> Element (Windows Script Host)",
+      "url": "https://learn.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/windows-scripting/dzfdccyf(v=vs.84)",
+      "checked": "2026-09-26"
+    },
+    {
+      "id": "ms-script-encoder",
+      "publisher": "Microsoft",
+      "title": "Script Encoder Syntax",
+      "url": "https://learn.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/windows-scripting/xw61tsx7(v=vs.84)",
+      "checked": "2026-09-26"
+    },
+    {
+      "id": "ms-hta",
+      "publisher": "Microsoft",
+      "title": "Introduction to HTML Applications (HTAs)",
+      "url": "https://learn.microsoft.com/en-us/previous-versions/ms536496(v=vs.85)",
+      "checked": "2026-09-26"
+    },
+    {
+      "id": "ms-task-exec",
+      "publisher": "Microsoft",
+      "title": "Exec (actionGroup) Element – Task Scheduler Schema",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/taskschd/taskschedulerschema-exec-actiongroup-element",
+      "checked": "2026-09-26"
+    },
+    {
+      "id": "ms-run-keys",
+      "publisher": "Microsoft",
+      "title": "Run and RunOnce Registry Keys",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/setupapi/run-and-runonce-registry-keys",
+      "checked": "2026-09-26"
+    },
+    {
+      "id": "ms-wmi-activescript",
+      "publisher": "Microsoft",
+      "title": "ActiveScriptEventConsumer class",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/wmisdk/activescripteventconsumer",
+      "checked": "2026-09-26"
+    },
+    {
+      "id": "ms-gpscr-scripts-ini",
+      "publisher": "Microsoft",
+      "title": "[MS-GPSCR]: Scripts.ini Syntax",
+      "url": "https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-gpscr/ff1fd13e-1e18-4160-9b50-0263e108e5e1",
+      "checked": "2026-09-26"
+    },
+    {
+      "id": "ms-msi-ca-types",
+      "publisher": "Microsoft",
+      "title": "Summary List of All Custom Action Types (Windows Installer)",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/msi/summary-list-of-all-custom-action-types",
+      "checked": "2026-09-26"
+    },
+    {
+      "id": "ms-msi-ca-type-6",
+      "publisher": "Microsoft",
+      "title": "Custom Action Type 6 (Windows Installer)",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/msi/custom-action-type-6",
+      "checked": "2026-09-26"
+    },
+    {
+      "id": "ms-msi-ca-return",
+      "publisher": "Microsoft",
+      "title": "Custom Action Return Processing Options (Windows Installer)",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/msi/custom-action-return-processing-options",
+      "checked": "2026-09-26"
+    },
+    {
+      "id": "ms-sysmon",
+      "publisher": "Microsoft",
+      "title": "Sysmon (Sysinternals)",
+      "url": "https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon",
+      "checked": "2026-09-26"
+    },
+    {
+      "id": "mitre-cwe-798",
+      "publisher": "MITRE",
+      "title": "CWE-798: Use of Hard-coded Credentials",
+      "url": "https://cwe.mitre.org/data/definitions/798.html",
+      "checked": "2026-09-26"
     }
   ],
   "rules": [
-    {
-      "id": "VBS-100",
-      "kind": "scriptFile",
-      "classification": "review",
-      "sources": ["ms-vbscript-timeline"]
-    },
+    { "id": "VBS-100", "kind": "scriptFile", "classification": "review", "sources": ["ms-vbscript-timeline"] },
     {
       "id": "VBS-101",
       "kind": "scriptFile",
       "classification": "breaks",
       "sources": ["ms-deprecated-features", "ms-vbscript-timeline"]
-    }
+    },
+    {
+      "id": "VBS-102",
+      "kind": "scriptFile",
+      "classification": "breaks",
+      "sources": ["ms-deprecated-features", "ms-vbscript-timeline", "ms-script-encoder"]
+    },
+    {
+      "id": "VBS-103",
+      "kind": "scriptFile",
+      "classification": "breaks",
+      "sources": ["ms-deprecated-features", "ms-vbscript-timeline", "ms-wsh-script-element"]
+    },
+    {
+      "id": "VBS-104",
+      "kind": "scriptFile",
+      "classification": "breaks",
+      "sources": ["ms-deprecated-features", "ms-vbscript-timeline", "ms-wsh-script-element"]
+    },
+    {
+      "id": "VBS-105",
+      "kind": "scriptFile",
+      "classification": "breaks",
+      "sources": ["ms-deprecated-features", "ms-vbscript-timeline", "ms-hta"]
+    },
+
+    { "id": "VBS-200", "kind": "scriptInvocation", "classification": "review", "sources": ["ms-vbscript-timeline"] },
+    {
+      "id": "VBS-201",
+      "kind": "scriptInvocation",
+      "classification": "breaks",
+      "sources": ["ms-deprecated-features", "ms-vbscript-timeline", "ms-wscript-command"]
+    },
+    {
+      "id": "VBS-202",
+      "kind": "scriptInvocation",
+      "classification": "review",
+      "sources": ["ms-wsh-script-element", "ms-hta"]
+    },
+    {
+      "id": "VBS-211",
+      "kind": "shortcut",
+      "classification": "breaks",
+      "sources": ["ms-deprecated-features", "ms-vbscript-timeline", "ms-wscript-command"]
+    },
+    { "id": "VBS-212", "kind": "shortcut", "classification": "review", "sources": ["ms-wsh-script-element", "ms-hta"] },
+
+    { "id": "VBS-300", "kind": "scheduledTask", "classification": "review", "sources": ["ms-vbscript-timeline"] },
+    {
+      "id": "VBS-301",
+      "kind": "scheduledTask",
+      "classification": "breaks",
+      "sources": ["ms-vbscript-detection", "ms-task-exec", "ms-vbscript-timeline"]
+    },
+    {
+      "id": "VBS-302",
+      "kind": "scheduledTask",
+      "classification": "review",
+      "sources": ["ms-task-exec", "ms-wsh-script-element"]
+    },
+    {
+      "id": "VBS-311",
+      "kind": "autostart",
+      "classification": "breaks",
+      "sources": ["ms-run-keys", "ms-vbscript-timeline"]
+    },
+    { "id": "VBS-312", "kind": "autostart", "classification": "review", "sources": ["ms-run-keys", "ms-wsh-script-element"] },
+    {
+      "id": "VBS-321",
+      "kind": "service",
+      "classification": "breaks",
+      "sources": ["ms-vbscript-detection", "ms-vbscript-timeline"]
+    },
+    { "id": "VBS-322", "kind": "service", "classification": "review", "sources": ["ms-wsh-script-element"] },
+    {
+      "id": "VBS-331",
+      "kind": "wmiSubscription",
+      "classification": "breaks",
+      "sources": ["ms-wmi-activescript", "ms-vbscript-timeline"]
+    },
+    {
+      "id": "VBS-332",
+      "kind": "wmiSubscription",
+      "classification": "review",
+      "sources": ["ms-wmi-activescript", "ms-wsh-script-element"]
+    },
+    {
+      "id": "VBS-341",
+      "kind": "logonScript",
+      "classification": "breaks",
+      "sources": ["ms-gpscr-scripts-ini", "ms-vbscript-detection", "ms-vbscript-timeline"]
+    },
+    {
+      "id": "VBS-342",
+      "kind": "logonScript",
+      "classification": "review",
+      "sources": ["ms-gpscr-scripts-ini", "ms-wsh-script-element"]
+    },
+
+    { "id": "VBS-400", "kind": "msiCustomAction", "classification": "review", "sources": ["ms-vbscript-detection"] },
+    {
+      "id": "VBS-401",
+      "kind": "msiCustomAction",
+      "classification": "breaks",
+      "sources": ["ms-vbscript-detection", "ms-msi-ca-types", "ms-msi-ca-type-6"]
+    },
+    {
+      "id": "VBS-402",
+      "kind": "msiCustomAction",
+      "classification": "review",
+      "sources": ["ms-msi-ca-return", "ms-msi-ca-types"]
+    },
+
+    { "id": "VBS-500", "kind": "eventLogUsage", "classification": "review", "sources": ["ms-vbscript-detection"] },
+    {
+      "id": "VBS-501",
+      "kind": "eventLogUsage",
+      "classification": "breaks",
+      "sources": ["ms-vbscript-status-2026-09", "ms-vbscript-timeline"]
+    },
+    {
+      "id": "VBS-502",
+      "kind": "eventLogUsage",
+      "classification": "breaks",
+      "sources": ["ms-vbscript-detection", "ms-sysmon"]
+    },
+    {
+      "id": "VBS-503",
+      "kind": "eventLogUsage",
+      "classification": "review",
+      "sources": ["ms-vbscript-detection", "ms-sysmon"]
+    },
+
+    { "id": "VBS-901", "kind": "hardcodedCredential", "classification": "review", "sources": ["mitre-cwe-798"] }
   ]
 }

@@ -12,6 +12,9 @@
     * every delete, rename and hard link (DeletePath, RenamePath, SetLinkPath),
     * every registry change (all write-type keywords of Kernel-Registry).
 
+  Listed but not counted as changes: create calls that only opened an existing key, and handle tags
+  (SetInformationKey, KeySetHandleTagsInformation) - state of an open handle, nothing stored in the registry.
+
   Passes only if the collector exits with 0, the only file it created or opened for creation is its
   result file, it made no other file change and no registry change, the scanned folder is unchanged
   (content hash, size, times, attributes), its working and temp folders stay empty and the output
@@ -125,6 +128,8 @@ function Test-SamePath([string] $DevicePath, [string] $Path) {
 $FILE_OPEN = 1
 $changes = [System.Collections.Generic.List[object]]::new()
 $histogram = @{}
+$openedExisting = @{}
+$handleTags = 0
 $controlFileSeen = 0; $controlRegistrySeen = 0; $controlDisposition = $null; $resultDisposition = $null
 $exitCode = 'not run'
 $before = Get-TreeState $scan
@@ -179,8 +184,21 @@ foreach ($record in Get-ProcessEvents $process.Id) {
   $histogram[$key] = 1 + ($histogram[$key] ?? 0)
   if ($record.ProviderName -eq 'Microsoft-Windows-Kernel-Registry') {
     $data = Get-EventData $record
-    # A CreateKey that only opened an existing key (REG_OPENED_EXISTING_KEY = 2) changes nothing.
-    if ($data['Disposition'] -and [UInt32]$data['Disposition'] -eq 2) { continue }
+    # A CreateKey that only opened an existing key (REG_OPENED_EXISTING_KEY = 2) changes nothing;
+    # the keys are listed in the report (Windows components in the process, e.g. COM, use RegCreateKeyEx to open).
+    if ($data['Disposition'] -and [UInt32]$data['Disposition'] -eq 2) {
+      $name = [string]$data['RelativeName']
+      $openedExisting[$name] = 1 + ($openedExisting[$name] ?? 0)
+      continue
+    }
+    # SetInformationKey with class 5 (KeySetHandleTagsInformation) sets tags on an open key handle - state of
+    # the handle that ends when it is closed, nothing stored in the registry (phnt ntregapi.h:
+    # KEY_HANDLE_TAGS_INFORMATION, "tags associated with the key handle"). The registry API sets them for WOW64
+    # view flags; the collector's own code opens keys without such flags, Windows' COM/WMI client code uses them.
+    if ($record.Id -eq 11 -and $data.ContainsKey('InfoClass') -and [UInt32]$data['InfoClass'] -eq 5) {
+      $handleTags++
+      continue
+    }
     $fields = ($data.GetEnumerator() | Sort-Object Name | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ' '
     $changes.Add([pscustomobject]@{ Kind = "registry event $($record.Id) $($record.TaskDisplayName)"; Target = $fields })
     continue
@@ -222,6 +240,8 @@ $report = @(
   "registry keywords:          $($registryUsed -join ', ')"
   "collector trace events:     $(($histogram.GetEnumerator() | Sort-Object Name | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ', ')"
   "changes by the collector:   $($changes.Count)"
+  "existing keys opened by create calls (unchanged): $(($openedExisting.GetEnumerator() | Sort-Object Name | ForEach-Object { "$($_.Name) ($($_.Value))" }) -join '; ')"
+  "handle tags on open keys (not stored in the registry): $handleTags"
   "scanned folder unchanged:   $(if ($treeDiff.Count) { 'NO' } else { 'yes' })"
   "output folder:              $($resultsListing -join ', ')"
   "working folder:             $($cwdListing -join ', ')"

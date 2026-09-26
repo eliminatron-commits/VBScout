@@ -127,7 +127,7 @@
         "kind": { "$ref": "#/$defs/openEnum", "description": "scriptFile | scriptInvocation | shortcut | scheduledTask | autostart | service | wmiSubscription | logonScript | msiCustomAction | eventLogUsage | officeMacro | hardcodedCredential" },
         "classification": { "$ref": "#/$defs/openEnum", "description": "breaks | review (unknown values are treated as review)" },
         "status": { "$ref": "#/$defs/openEnum", "description": "detected | notCheckable" },
-        "reason": { "$ref": "#/$defs/openEnum", "description": "Only for notCheckable: passwordProtected | accessDenied | locked | corrupt | unsupportedFormat | tooLarge | cloudPlaceholder | encrypted | internalError" },
+        "reason": { "$ref": "#/$defs/openEnum", "description": "Only for notCheckable: passwordProtected | accessDenied | locked | corrupt | unsupportedFormat | tooLarge | cloudPlaceholder | encrypted | networkLocation | internalError" },
         "activation": { "$ref": "#/$defs/openEnum", "description": "automatic | logged | macro | installer | manual | dormant" },
         "location": {
           "type": "object",

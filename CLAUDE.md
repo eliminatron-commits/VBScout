@@ -29,17 +29,22 @@ Two programs:
 | App smoke test | `vbs-app --smoke-test[=secs]` – exit 0 = started, result file written + imported (2 = UI not ready, 3 = self-check failed); Linux headless: `xvfb-run -a dbus-run-session -- target/release/vbs-app --smoke-test` |
 | Read-only trace | Linux: `bash scripts/readonly/linux.sh <collector> <folder>` · Windows (elevated pwsh): `scripts/readonly/windows.ps1 -Exe <exe> -ScanPath <folder>` |
 | Network block test | Linux: `bash scripts/nettest/linux.sh [--gui] <out> -- <program> [args…]` · Windows (elevated pwsh): `scripts/nettest/windows.ps1 -Exe <exe> -Arguments … [-WebView]` |
+| Scan performance (DoD #5) | `cargo test --release -p vbs-collector --test performance -- --ignored --nocapture` (100,000 files < 10 min) |
+| System test with real Windows artefacts | elevated pwsh on a disposable machine: `scripts/systemtest/windows.ps1 -Exe <exe>`; limited scan without admin rights: `scripts/systemtest/nonadmin.ps1 -Exe <exe> -ScanPath <folder>` |
+| Test collection | `cargo test -p vbs-collector --test corpus`; print what `positive/` yields: `… -- --ignored --nocapture print_positive_cases`; binary fixtures: `python3 tests/corpus/make-binaries.py` (needs msitools, pylnk3) |
 | Program size | `node scripts/check-size.mjs <exe> <maxMB>` (collector: 10) |
+| Program imports | `node scripts/check-imports.mjs <exe> [--out <list>]` – only reviewed Windows system DLLs, no C runtime, no network DLLs (`--self-test` in `check:all`) |
 | Propagate product.json | `npm run sync:config` |
 | Cross-check Windows code on Linux | `cargo clippy --target x86_64-pc-windows-msvc -p vbs-collector --all-targets -- -D warnings` |
 
 The toolchain is pinned in `rust-toolchain.toml` (same as Stepwright). Building the app crate on Linux needs
 WebKitGTK 4.1 (`libwebkit2gtk-4.1-dev`); the product itself targets Windows x64 only.
 
-CI (`.github/workflows/ci.yml`): checks (ubuntu) → Linux job (fmt, clippy, tests, Cargo-graph offline check, strace
-read-only trace and network test of the collector) and Windows job (clippy, tests, release builds with static CRT,
-size check, full scan of the runner, ETW read-only trace, network block tests of collector and app, app smoke test).
-Logs are uploaded as artifacts.
+CI (`.github/workflows/ci.yml`): checks (ubuntu) → Linux job (fmt, clippy, tests, Cargo-graph offline check,
+performance test, strace read-only trace and network test of the collector) and Windows jobs on windows-2025 and
+windows-2022 (clippy, tests, release build with static CRT, size and import check, performance test, ETW read-only trace,
+network block test, non-admin run, system test with artefacts made by Windows, full scan of the runner without
+internal errors; app build, smoke and network tests on 2025). Logs and results are uploaded as artifacts.
 
 ## Layout
 
@@ -53,13 +58,15 @@ crates/
   vbs-core/             result model + .vbscout container (read/write/validate/migrate), rule catalog, module
                         interface (Module, Report, CandidateFile), read-only system views, secret masking
   vbs-collector/        collector CLI: cli, engine, walk, read_only (only way to open files), output (ONLY writer),
-                        platform/{windows/,other.rs} (all OS calls), modules/ (finding types, phases 2–3)
+                        platform/{windows/,other.rs} (all OS calls: registry, event logs, WMI via COM),
+                        analysis/ (format readers without I/O: command lines, markup, .lnk, .msi, .vbe, scripts.ini,
+                        event XML, registry hive files), modules/ (one file per finding type; Office macros in phase 3)
   vbs-evaluation/       evaluation logic without UI: import (phase 1); merge, de-dup, risk, effort, reports (phase 4)
   vbs-license/          license interface (offline only; Ed25519 format + org/MSP keys in phase 5)
 src-tauri/              Tauri shell (crate vbs-app): commands, smoke test, settings, tauri.conf.json, capabilities, icons
 src/                    Svelte 5 + TypeScript frontend (view only; talks to Rust via IPC)
-tests/corpus/           positive/ and negative/ collections + expected.json (Definition of Done #4)
-scripts/                sync-config, check-i18n/offline/readonly/size (Node, no deps); nettest/, readonly/ (dynamic)
+tests/corpus/           positive/ and negative/ collections incl. system/ fixtures + expected.json (DoD #4), make-binaries.py
+scripts/                sync-config, check-i18n/offline/readonly/size (Node, no deps); nettest/, readonly/, systemtest/ (dynamic)
 docs/                   result-format.md, result.schema.json, examples/, research-notes.md (sources with dates)
 ```
 
@@ -77,8 +84,13 @@ Later phases add: `worker/` + `tools/` license keys (5), `packaging/` winget + i
   Frozen after the first public release; a rename adds the old media type to `legacyMimeTypes`.
 - Rule IDs `VBS-nnn`, stable forever: 1xx script files, 2xx scripts/shortcuts starting VBScript, 3xx tasks, autostart,
   services, WMI, logon scripts, 4xx MSI, 5xx event logs, 6xx Office macros, 9xx security; `x00` = "could not be
-  checked" of that range. Texts: `rule.vbs101.title` / `.rationale`.
-- Coverage source IDs: `files.localDrives`, `files.paths`, `files.networkPaths`, `<area>.<name>` for system sources.
+  checked" of that range (the finding states the actual kind, e.g. `VBS-200` for a shortcut). Within a range each kind
+  has a decade: `x1` = runs VBScript (`breaks`), `x2` = starts a script of unknown language (`review`), e.g. 301/302
+  tasks, 311/312 autostart, 321/322 services, 331/332 WMI, 341/342 logon scripts. Texts: `rule.vbs101.title` /
+  `.rationale`.
+- Coverage source IDs: `files.localDrives`, `files.paths`, `files.networkPaths`, `<area>.<name>` for system sources
+  (`tasks.scheduled`, `autostart.entries`, `services.configuration`, `wmi.subscriptions`, `policies.scripts`,
+  `installer.packages`, `eventLog.vbscriptDeprecation`, `eventLog.sysmon`; list in `docs/result-format.md`).
 - i18n keys: flat, dot-separated camelCase; plurals `_one/_few/_many/_other`; keys outside `t()` calls wrapped in
   `key("…")`; dynamic keys only with the prefixes `kind.`, `activation.`, `reason.`, `limitation.`, `classification.`,
   `findingStatus.`, `rule.` (their completeness is tested in `vbs-core`).
@@ -98,31 +110,42 @@ Later phases add: `worker/` + `tools/` license keys (5), `packaging/` winget + i
 3. **Read-only by construction and by proof.** Files are opened only in `read_only.rs` (read access, full sharing),
    the result only in `output.rs` (`create_new`, never overwrite; `--out` names an existing folder or a file with the
    result extension; folders are never created; without `--out` never inside the Windows directory, e.g. a GPO run
-   as SYSTEM in `System32`). Registry keys only with `KEY_READ`, no hive
-   loading, logs only queried once, no subscriptions, no process start. Proof in three layers: static
-   (`check-readonly.mjs` with self-test), dynamic snapshot test (`tests/read_only.rs`), kernel traces with positive
-   control (`scripts/readonly/`: strace, ETW Kernel-File/Kernel-Registry). Windows may update last-access times when
-   files are read (volume policy, like any reader) – documented, not avoidable without write access.
+   as SYSTEM in `System32`). Registry keys only with `KEY_READ` (no WOW64 view flags – they tag handles, which a
+   kernel trace lists as a "set"; the 32-bit view is read at `SOFTWARE\WOW6432Node`), no hive loading (hives of users
+   who are not logged on are read as files), logs only queried once, no subscriptions, no process start. Proof in
+   three layers: static (`check-readonly.mjs` with self-test), dynamic snapshot test (`tests/read_only.rs`), kernel
+   traces with positive control (`scripts/readonly/`: strace, ETW Kernel-File/Kernel-Registry). Windows may update
+   last-access times when files are read (volume policy, like any reader) – documented, not avoidable without write
+   access.
 4. **The walk never triggers side effects**: no links/junctions/mount points followed, no online-only cloud files
    (`RECALL_ON_DATA_ACCESS`/`OFFLINE`) opened – reported as not checkable – and no cloud directories
    (`RECALL_ON_OPEN`) listed, because both would download data. Non-regular files (FIFOs, devices) are never opened.
    SUBST drives are skipped (duplicates). Network paths only with `--include-unc`, read with the running account.
-5. **Result file** (`docs/result-format.md`): ZIP with `mimetype` + `result.json`, versioned schema with JSON Schema,
+5. **Detection** (`crates/vbs-collector/src/analysis/command.rs`): a command runs VBScript when it starts the Script
+   Host with a `.vbs`/`.vbe` file or `//E:VBScript`, starts a `.vbs`/`.vbe` directly or contains `vbscript:` code;
+   `.wsf`/`.hta`/`.wsc` and the Script Host with other files are "unknown language" (`review`); JScript is never a
+   finding. System modules look one level into batch/PowerShell/KiXtart files an entry starts, through the file
+   view – which refuses network paths, mapped network drives, device paths, links and cloud placeholders (a script on
+   the network becomes `notCheckable`/`networkLocation`). User hives that are not loaded are never loaded: the
+   profile's `NTUSER.DAT` is read as a file (`analysis/regf.rs`); if that fails, the autostart source is `partial`
+   (`userHivesNotRead`). Installer packages are read as compound files
+   (`cfb` crate), scripts decoded from UTF-8/UTF-16/ANSI, `.vbe` decoded (reversible Script Encoder substitution).
+6. **Result file** (`docs/result-format.md`): ZIP with `mimetype` + `result.json`, versioned schema with JSON Schema,
    open enumerations (unknown values kept, unknown classification = review), migrations for breaking changes,
    limits against malicious files, deterministic finding order. Coverage is recorded per source with limitations
    (not elevated, files only, restricted paths, failed sources) – never a completeness promise.
-6. **Rule catalog as data** (`rules/catalog.json`): every rule has `breaks`/`review`, at least one source with URL and
+7. **Rule catalog as data** (`rules/catalog.json`): every rule has `breaks`/`review`, at least one source with URL and
    "checked" date; uncertain cases are always `review`; "could not be checked" rules are always `review`. Texts are
    translated in `i18n/`. Timeline statements are always "expected" with source and date.
-7. **Privacy**: evidence only as short excerpts of affected lines; secrets masked twice (report + writer) and never
+8. **Privacy**: evidence only as short excerpts of affected lines; secrets masked twice (report + writer) and never
    stored; machine ID pseudonymous; no user names beyond necessary paths.
-8. **Editions**: collector always free. Evaluation free = finding list, ≤ `editions.free.maxMachines` machines, no
+9. **Editions**: collector always free. Evaluation free = finding list, ≤ `editions.free.maxMachines` machines, no
    PDF, no migration hints, no effort; organization license (one-time, org name in reports, unlimited machines);
    MSP license (yearly, expiry against the system clock, unlimited customer environments, own logo and company name).
    Keys are verified offline only (Ed25519, phase 5).
-9. **i18n** (from Stepwright): one set of catalogs for Rust and UI, 8 languages; en and de reviewed, the others marked
+10. **i18n** (from Stepwright): one set of catalogs for Rust and UI, 8 languages; en and de reviewed, the others marked
    with a correction hint; completeness, placeholders, plurals and used keys checked in CI.
-10. **Offline guarantee** (from Stepwright): static (`check-offline.mjs`: IPC-only CSP, capabilities, deny lists,
+11. **Offline guarantee** (from Stepwright): static (`check-offline.mjs`: IPC-only CSP, capabilities, deny lists,
     sources, WebView2 switches, collector graph without tokio/sockets; `clippy.toml` bans `std::net` and
     `Command::new`) and dynamic (`scripts/nettest/`: blocks and logs every connection attempt with a positive
     control, for the collector and the app).

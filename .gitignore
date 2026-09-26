@@ -9,6 +9,7 @@
 /readonly-out/
 /perf-out/
 *.log
+__pycache__/
 
 # Result files produced by local test runs (the corpus itself lives in tests/corpus/)
 /*.vbscout

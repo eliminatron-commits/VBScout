@@ -1,0 +1,13 @@
+<html>
+<head>
+<title>Admin console</title>
+<HTA:APPLICATION ID="console" APPLICATIONNAME="Admin console" />
+<script language="VBScript">
+Sub RunInventory
+  Set shell = CreateObject("WScript.Shell")
+  shell.Run "cscript //nologo C:\Scripts\inventory.vbe"
+End Sub
+</script>
+</head>
+<body><input type="button" value="Inventory" onclick="RunInventory"></body>
+</html>

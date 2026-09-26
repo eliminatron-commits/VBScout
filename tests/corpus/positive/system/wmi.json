@@ -1,0 +1,51 @@
+{
+  "namespaces": {
+    "ROOT\\subscription": {
+      "__EventFilter": [
+        {
+          "path": "__EventFilter.Name=\"Every5Minutes\"",
+          "properties": {
+            "Name": "Every5Minutes",
+            "Query": "SELECT * FROM __InstanceModificationEvent WITHIN 300 WHERE TargetInstance ISA 'Win32_PerfFormattedData_PerfOS_System'"
+          }
+        }
+      ],
+      "__FilterToConsumerBinding": [
+        {
+          "path": "__FilterToConsumerBinding.Consumer=\"ActiveScriptEventConsumer.Name=\\\"LegacyCleanup\\\"\"",
+          "properties": {
+            "Consumer": "\\\\.\\ROOT\\subscription:ActiveScriptEventConsumer.Name=\"LegacyCleanup\"",
+            "Filter": "__EventFilter.Name=\"Every5Minutes\""
+          }
+        }
+      ],
+      "ActiveScriptEventConsumer": [
+        {
+          "path": "ActiveScriptEventConsumer.Name=\"LegacyCleanup\"",
+          "properties": {
+            "Name": "LegacyCleanup",
+            "ScriptingEngine": "VBScript",
+            "ScriptText": "Set fso = CreateObject(\"Scripting.FileSystemObject\")\r\npwd = \"hunter2\"\r\nfso.DeleteFile \"C:\\Temp\\*.tmp\""
+          }
+        }
+      ],
+      "CommandLineEventConsumer": [
+        {
+          "path": "CommandLineEventConsumer.Name=\"RunReport\"",
+          "properties": {
+            "Name": "RunReport",
+            "CommandLineTemplate": "cscript.exe //nologo C:\\Reports\\nightly.vbs"
+          }
+        },
+        {
+          "path": "CommandLineEventConsumer.Name=\"OpenMenu\"",
+          "properties": {
+            "Name": "OpenMenu",
+            "ExecutablePath": "C:\\Windows\\System32\\wscript.exe",
+            "CommandLineTemplate": "wscript.exe C:\\Tools\\menu.wsf"
+          }
+        }
+      ]
+    }
+  }
+}

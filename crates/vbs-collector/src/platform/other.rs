@@ -39,7 +39,7 @@ pub fn host() -> Host {
     };
     Host {
         machine,
-        env: SystemEnvironment { elevated: is_root(), system_root: None, program_data: None },
+        env: SystemEnvironment { elevated: is_root(), ..SystemEnvironment::default() },
         local_roots: vec![PathBuf::from("/")],
         registry: Box::new(Unavailable),
         files: Box::new(ReadOnlyFiles),
@@ -62,6 +62,11 @@ fn is_root() -> bool {
 
 pub fn entry_state(_metadata: &Metadata) -> EntryState {
     EntryState::default()
+}
+
+/// Development platforms have no drive letters.
+pub fn is_remote_drive(_path: &Path) -> bool {
+    false
 }
 
 pub fn skip_dir(path: &Path) -> bool {

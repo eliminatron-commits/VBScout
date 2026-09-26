@@ -25,11 +25,15 @@ use time::OffsetDateTime;
 
 use crate::model::{
     Activation, Classification, Detail, Evidence, FileFacts, Finding, FindingKind, FindingStatus, Location,
-    LocationKind, NotCheckableReason, SourceStatus,
+    LocationKind, NotCheckableReason, SourceStatus, TimeRange,
 };
 use crate::rules;
+use crate::secrets::{self, SecretKind};
 use crate::validate::{self, limits};
 use crate::views::SystemView;
+
+/// Rule of the security finding "hard-coded credentials" (value never stored).
+pub const CREDENTIAL_RULE: &str = "VBS-901";
 
 /// Static description of a module.
 #[derive(Debug)]
@@ -54,6 +58,11 @@ pub trait Module: Send + Sync {
 
     /// Lower-case file extensions without the dot (e.g. `vbs`) this module inspects.
     fn extensions(&self) -> &'static [&'static str] {
+        &[]
+    }
+
+    /// Lower-case file names (e.g. `scripts.ini`) this module inspects in addition to its extensions.
+    fn file_names(&self) -> &'static [&'static str] {
         &[]
     }
 
@@ -159,6 +168,9 @@ pub struct Report {
     findings: Vec<Finding>,
     counters: Counters,
     status: Option<(SourceStatus, String)>,
+    roots: Vec<String>,
+    skipped: u64,
+    time_range: Option<TimeRange>,
 }
 
 impl Report {
@@ -218,6 +230,75 @@ impl Report {
         self.counters.inspected += count;
     }
 
+    /// Counts items deliberately not examined (e.g. user hives that are not loaded).
+    pub fn count_skipped(&mut self, count: u64) {
+        self.skipped += count;
+    }
+
+    /// Names a location the module examined (a folder, key or log channel) for the coverage entry.
+    pub fn add_root(&mut self, root: impl Into<String>) {
+        let root = root.into();
+        if !self.roots.contains(&root) && self.roots.len() < limits::MAX_ERROR_SAMPLES {
+            self.roots.push(root);
+        }
+    }
+
+    /// Widens the time span of the log records that were available (log coverage).
+    pub fn cover_time(&mut self, from: OffsetDateTime, to: OffsetDateTime) {
+        let (from, to) = if from <= to { (from, to) } else { (to, from) };
+        self.time_range = Some(match self.time_range {
+            Some(range) => TimeRange { from: range.from.min(from), to: range.to.max(to) },
+            None => TimeRange { from, to },
+        });
+    }
+
+    /// Reports the security finding "hard-coded credentials" (`VBS-901`) if `lines` contain
+    /// passwords, connection-string passwords or URL credentials. Only masked lines are kept
+    /// as evidence and the values are never stored. Returns the number of secrets found.
+    pub fn credentials<'l>(
+        &mut self,
+        location: Location,
+        file: Option<FileFacts>,
+        activation: Activation,
+        lines: impl IntoIterator<Item = (Option<u32>, &'l str)>,
+    ) -> usize {
+        let mut kinds: Vec<SecretKind> = Vec::new();
+        let mut evidence: Vec<(Option<u32>, &str)> = Vec::new();
+        let mut count = 0;
+        for (line, text) in lines {
+            let masked = secrets::mask_line(text);
+            if !masked.masked() {
+                continue;
+            }
+            count += masked.secrets.len();
+            for kind in &masked.secrets {
+                if !kinds.contains(kind) {
+                    kinds.push(*kind);
+                }
+            }
+            // The builder masks the line again on arrival (and marks it as masked).
+            evidence.push((line, text));
+        }
+        if count == 0 {
+            return 0;
+        }
+        kinds.sort();
+        let kind_names: Vec<&str> = kinds.iter().map(|kind| kind.as_str()).collect();
+        let mut builder = self
+            .finding(CREDENTIAL_RULE, location)
+            .activation(activation)
+            .detail("secrets", i64::try_from(count).unwrap_or(i64::MAX))
+            .detail("secretKinds", kind_names.join(","));
+        if let Some(file) = file {
+            builder = builder.file(file);
+        }
+        for (line, text) in &evidence {
+            builder = builder.evidence(*line, text);
+        }
+        builder.emit();
+        count
+    }
+
     /// Records an unreadable item; the first few are kept as examples.
     pub fn record_error(&mut self, sample: impl Into<String>) {
         self.counters.errors += 1;
@@ -241,6 +322,18 @@ impl Report {
         self.status.as_ref()
     }
 
+    pub fn roots(&self) -> &[String] {
+        &self.roots
+    }
+
+    pub fn skipped(&self) -> u64 {
+        self.skipped
+    }
+
+    pub fn time_range(&self) -> Option<TimeRange> {
+        self.time_range
+    }
+
     pub fn into_parts(self) -> (Vec<Finding>, Counters) {
         (self.findings, self.counters)
     }
@@ -255,6 +348,14 @@ pub struct FindingBuilder<'r> {
 }
 
 impl FindingBuilder<'_> {
+    /// States the kind of an item that could not be checked. A "could not be checked" rule
+    /// (`VBS-x00`) covers its whole range, e.g. `VBS-200` scripts *and* shortcuts.
+    pub fn kind(mut self, kind: FindingKind) -> Self {
+        debug_assert!(self.finding.rule.ends_with("00"), "only VBS-x00 rules may state their kind");
+        self.finding.kind = kind;
+        self
+    }
+
     pub fn activation(mut self, activation: Activation) -> Self {
         self.finding.activation = activation;
         self
@@ -388,6 +489,52 @@ mod tests {
         assert_eq!(finding.evidence.len(), limits::MAX_EVIDENCE_LINES);
         assert!(finding.evidence.iter().all(|e| e.masked && !e.text.contains("secret")));
         assert_eq!(finding.details["evidenceOmitted"], Detail::Number(3));
+    }
+
+    #[test]
+    fn credentials_are_reported_without_their_values() {
+        let location = Location { kind: LocationKind::File, path: "logon.vbs".into(), item: None };
+        let mut report = Report::new();
+        let lines = [
+            (Some(1), "Set shell = CreateObject(\"WScript.Shell\")"),
+            (Some(2), "strPwd = \"Sommer2024!\""),
+            (Some(3), "conn.Open \"DSN=x;UID=sa;PWD=hunter2\""),
+        ];
+        assert_eq!(report.credentials(location.clone(), None, Activation::Automatic, lines), 2);
+        assert_eq!(report.credentials(location, None, Activation::Dormant, [(Some(1), "MsgBox 1")]), 0);
+        let findings = report.findings();
+        assert_eq!(findings.len(), 1);
+        let finding = &findings[0];
+        assert_eq!((finding.rule.as_str(), &finding.kind), (CREDENTIAL_RULE, &FindingKind::HardcodedCredential));
+        assert_eq!(finding.activation, Activation::Automatic);
+        assert_eq!(finding.details["secrets"], Detail::Number(2));
+        assert_eq!(finding.details["secretKinds"], Detail::Text("password,connectionString".into()));
+        assert_eq!(finding.evidence.iter().map(|e| e.line).collect::<Vec<_>>(), [Some(2), Some(3)]);
+        let text = serde_json::to_string(finding).unwrap();
+        assert!(!text.contains("Sommer2024!") && !text.contains("hunter2"), "{text}");
+    }
+
+    #[test]
+    fn coverage_extras_accumulate() {
+        let mut report = Report::new();
+        report.add_root("Application");
+        report.add_root("Application");
+        report.count_skipped(3);
+        let (a, b) = (OffsetDateTime::UNIX_EPOCH, OffsetDateTime::UNIX_EPOCH + time::Duration::days(2));
+        report.cover_time(b, a + time::Duration::days(1));
+        report.cover_time(a, a);
+        assert_eq!(report.roots(), ["Application"]);
+        assert_eq!(report.skipped(), 3);
+        assert_eq!(report.time_range(), Some(TimeRange { from: a, to: b }));
+        let not_checkable = report
+            .not_checkable(
+                "VBS-100",
+                Location { kind: LocationKind::File, path: "x.lnk".into(), item: None },
+                NotCheckableReason::Corrupt,
+            )
+            .kind(FindingKind::Shortcut);
+        not_checkable.emit();
+        assert_eq!(report.findings()[0].kind, FindingKind::Shortcut);
     }
 
     #[test]

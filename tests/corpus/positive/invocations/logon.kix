@@ -1,0 +1,2 @@
+; KiXtart logon script
+SHELL "cscript //nologo \\contoso.local\netlogon\map-drives.vbs"

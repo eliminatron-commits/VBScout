@@ -11,7 +11,9 @@
 //! * [`output`] – the **only** place that writes to disk: the result file.
 //! * [`platform`] – machine facts and read-only system views per platform.
 //! * [`modules`] – the finding-type modules.
+//! * [`analysis`] – format readers and detectors the modules share (no file access).
 
+pub mod analysis;
 pub mod cli;
 pub mod console;
 pub mod engine;

@@ -385,6 +385,9 @@ open_enum! {
         CloudPlaceholder = "cloudPlaceholder",
         /// Encrypted (e.g. EFS or an encrypted Office file).
         Encrypted = "encrypted",
+        /// A script on a network path that system sources refer to: never read without
+        /// `--include-unc` (no network access).
+        NetworkLocation = "networkLocation",
         /// The analysis failed unexpectedly (bug report welcome).
         InternalError = "internalError",
     }

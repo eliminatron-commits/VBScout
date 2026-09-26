@@ -1,6 +1,5 @@
-//! Read-only registry view. Keys are opened with `KEY_READ` (plus the WOW64
-//! view flag) and closed again; there is no code path that creates, changes,
-//! loads or deletes anything.
+//! Read-only registry view. Keys are opened with `KEY_READ` and closed again;
+//! there is no code path that creates, changes, loads or deletes anything.
 
 use std::ptr;
 
@@ -9,9 +8,9 @@ use windows_sys::Win32::Foundation::{
     ERROR_ACCESS_DENIED, ERROR_FILE_NOT_FOUND, ERROR_MORE_DATA, ERROR_NO_MORE_ITEMS, ERROR_SUCCESS, WIN32_ERROR,
 };
 use windows_sys::Win32::System::Registry::{
-    HKEY, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, HKEY_USERS, KEY_READ, KEY_WOW64_32KEY, KEY_WOW64_64KEY, REG_BINARY,
-    REG_DWORD, REG_EXPAND_SZ, REG_MULTI_SZ, REG_QWORD, REG_SZ, RegCloseKey, RegEnumKeyExW, RegEnumValueW,
-    RegOpenKeyExW, RegQueryInfoKeyW,
+    HKEY, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, HKEY_USERS, KEY_READ, KEY_WOW64_64KEY, REG_BINARY, REG_DWORD,
+    REG_EXPAND_SZ, REG_MULTI_SZ, REG_QWORD, REG_SZ, RegCloseKey, RegEnumKeyExW, RegEnumValueW, RegOpenKeyExW,
+    RegQueryInfoKeyW,
 };
 
 /// Largest value the view reads (registry values are small; this bounds memory on odd data).
@@ -49,21 +48,36 @@ fn open(hive: Hive, path: &str, bitness: Bitness) -> Result<Key, ViewError> {
         Hive::CurrentUser => HKEY_CURRENT_USER,
         Hive::Users => HKEY_USERS,
     };
-    // The 64-bit collector sees the native view by default. Passing KEY_WOW64_64KEY anyway
-    // makes advapi32 tag the handle (NtSetInformationKey), which a kernel trace rightly lists
-    // as a "set" operation – so the flag is only used where it changes the view.
-    let view = match bitness {
-        Bitness::Native if cfg!(target_pointer_width = "64") => 0,
-        Bitness::Native => KEY_WOW64_64KEY,
-        Bitness::Wow32 => KEY_WOW64_32KEY,
-    };
-    let path = wide(path.trim_matches('\\'));
+    let (path, view) = view_path(hive, path.trim_matches('\\'), bitness);
+    let path = wide(&path);
     let mut key: HKEY = ptr::null_mut();
     // SAFETY: `path` is NUL-terminated and outlives the call; on success `key`
     // receives a handle opened with read access only, owned by `Key`.
     let status = unsafe { RegOpenKeyExW(root, path.as_ptr(), 0, KEY_READ | view, &mut key) };
     check(status)?;
     Ok(Key(key))
+}
+
+/// The key path to open for a view, and the WOW64 flag it needs.
+///
+/// The 64-bit collector reads both views without WOW64 flags: the 64-bit view is its own, and the
+/// 32-bit view of `HKLM\SOFTWARE` – the part WOW64 redirects – is the physical key
+/// `SOFTWARE\WOW6432Node`; everything else is shared by both views. A view flag would make
+/// advapi32 tag the parent handle (`NtSetInformationKey`, `KeySetHandleTagsInformation`): no
+/// change to the registry, but a "set" operation in a kernel trace, and the read-only proof counts
+/// every one of them. Keys that WOW64 shares under `SOFTWARE` have no `WOW6432Node` twin, so
+/// their values are not reported twice.
+fn view_path(hive: Hive, path: &str, bitness: Bitness) -> (String, u32) {
+    if cfg!(target_pointer_width = "32") {
+        // A 32-bit build (not shipped) is redirected itself and needs the flag for the 64-bit view.
+        return (path.to_owned(), if bitness == Bitness::Native { KEY_WOW64_64KEY } else { 0 });
+    }
+    let software = path.get(..8).is_some_and(|head| head.eq_ignore_ascii_case("SOFTWARE"))
+        && matches!(path.as_bytes().get(8), None | Some(b'\\'));
+    match (bitness, hive) {
+        (Bitness::Wow32, Hive::LocalMachine) if software => (format!(r"SOFTWARE\WOW6432Node{}", &path[8..]), 0),
+        _ => (path.to_owned(), 0),
+    }
 }
 
 /// Sizes reported by RegQueryInfoKeyW (in characters for names, bytes for data).
@@ -210,5 +224,34 @@ impl RegistryView for WinRegistry {
             index += 1;
         }
         Ok(values)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_32_bit_view_is_read_through_wow6432node_without_view_flags() {
+        let run = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
+        assert_eq!(view_path(Hive::LocalMachine, run, Bitness::Native), (run.to_owned(), 0));
+        assert_eq!(
+            view_path(Hive::LocalMachine, run, Bitness::Wow32),
+            (r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run".to_owned(), 0)
+        );
+        assert_eq!(view_path(Hive::LocalMachine, "software", Bitness::Wow32), (r"SOFTWARE\WOW6432Node".to_owned(), 0));
+        // Shared parts of the registry are the same in both views.
+        let services = r"SYSTEM\CurrentControlSet\Services";
+        assert_eq!(view_path(Hive::LocalMachine, services, Bitness::Wow32), (services.to_owned(), 0));
+        assert_eq!(view_path(Hive::LocalMachine, "SOFTWAREX", Bitness::Wow32), ("SOFTWAREX".to_owned(), 0));
+        assert_eq!(view_path(Hive::Users, r"S-1-5-18\Software", Bitness::Wow32), (r"S-1-5-18\Software".to_owned(), 0));
+    }
+
+    #[test]
+    fn reads_the_32_bit_view_of_this_machine() {
+        // Every 64-bit Windows has the WOW6432Node twin of the Windows key.
+        let key = r"SOFTWARE\Microsoft\Windows\CurrentVersion";
+        assert!(WinRegistry.values(Hive::LocalMachine, key, Bitness::Wow32).is_ok());
+        assert!(WinRegistry.subkeys(Hive::LocalMachine, key, Bitness::Native).unwrap().iter().any(|k| k == "Run"));
     }
 }

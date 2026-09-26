@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<component>
+<registration progid="Contoso.Js" classid="{8B6A1E2C-3D4F-4A5B-9C6D-7E8F9A0B1C2D}" version="1.0"/>
+<script language="JScript">
+function add(a, b) { return a + b; }
+</script>
+</component>

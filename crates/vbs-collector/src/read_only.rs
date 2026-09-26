@@ -8,11 +8,14 @@
 //! virus scanner (see CLAUDE.md).
 
 use std::fs::{self, File, OpenOptions};
-use std::io::{self, Read};
+use std::io::{self, BufReader, Read};
 use std::path::Path;
 
-use vbs_core::module::ReadError;
+use time::OffsetDateTime;
+use vbs_core::module::{ReadError, ReadSeek};
 use vbs_core::views::{DirEntryInfo, FileView, ViewError};
+
+use crate::platform;
 
 /// Opens `path` for reading only.
 pub fn open(path: &Path) -> io::Result<File> {
@@ -57,19 +60,73 @@ pub fn classify(error: &io::Error) -> ReadError {
 }
 
 fn view_error(error: &io::Error) -> ViewError {
-    match error.kind() {
-        io::ErrorKind::PermissionDenied => ViewError::AccessDenied,
-        io::ErrorKind::NotFound => ViewError::NotFound,
+    match classify(error) {
+        ReadError::AccessDenied => ViewError::AccessDenied,
+        ReadError::NotFound => ViewError::NotFound,
+        ReadError::Locked => ViewError::Locked,
         _ => ViewError::Failed(error.to_string()),
     }
 }
 
-/// [`FileView`] over the real file system, read-only.
+/// [`FileView`] over the real local file system, read-only. Network paths and network drives
+/// are refused: system modules follow paths from the registry, task definitions or policies,
+/// and none of them may cause network access (the walk reads network paths only when they are
+/// given explicitly with `--include-unc`).
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ReadOnlyFiles;
 
+impl ReadOnlyFiles {
+    /// Refuses everything that is not a plain local path: network paths and drives, device
+    /// paths (`\\.\pipe\…` would block), relative paths and paths through a link that
+    /// points to the network.
+    fn local(path: &Path) -> Result<(), ViewError> {
+        if platform::is_network_location(path) {
+            return Err(ViewError::NetworkPath);
+        }
+        let text = path.to_string_lossy();
+        let verbatim_drive = text.strip_prefix(r"\\?\").is_some_and(|rest| rest.as_bytes().get(1) == Some(&b':'));
+        if (text.starts_with(r"\\") || text.starts_with("//")) && !verbatim_drive {
+            return Err(ViewError::Failed("device path (not read)".into()));
+        }
+        if !path.is_absolute() {
+            return Err(ViewError::Failed("relative path (not read)".into()));
+        }
+        for ancestor in path.ancestors().skip(1) {
+            let is_link = fs::symlink_metadata(ancestor).is_ok_and(|m| m.file_type().is_symlink());
+            if is_link && fs::read_link(ancestor).is_ok_and(|target| platform::is_network_location(&target)) {
+                return Err(ViewError::NetworkPath);
+            }
+        }
+        Ok(())
+    }
+
+    /// A regular local file that can be read without side effects (no link, no device, no cloud placeholder).
+    fn plain_file(path: &Path) -> Result<(), ViewError> {
+        Self::local(path)?;
+        let metadata = fs::symlink_metadata(path).map_err(|e| view_error(&e))?;
+        if metadata.file_type().is_symlink() {
+            return Err(ViewError::Failed("link (not followed)".into()));
+        }
+        if !metadata.is_file() {
+            return Err(ViewError::Failed("not a regular file".into()));
+        }
+        if platform::entry_state(&metadata).placeholder {
+            return Err(ViewError::CloudPlaceholder);
+        }
+        Ok(())
+    }
+}
+
 impl FileView for ReadOnlyFiles {
     fn list_dir(&self, path: &Path) -> Result<Vec<DirEntryInfo>, ViewError> {
+        Self::local(path)?;
+        let metadata = fs::symlink_metadata(path).map_err(|e| view_error(&e))?;
+        if metadata.file_type().is_symlink() {
+            return Err(ViewError::Failed("link (not followed)".into()));
+        }
+        if platform::entry_state(&metadata).recall_on_open {
+            return Err(ViewError::CloudPlaceholder);
+        }
         let mut entries = Vec::new();
         for entry in fs::read_dir(path).map_err(|e| view_error(&e))? {
             let entry = entry.map_err(|e| view_error(&e))?;
@@ -77,22 +134,33 @@ impl FileView for ReadOnlyFiles {
             if file_type.is_symlink() {
                 continue; // links and junctions are never followed
             }
-            let size = if file_type.is_file() { entry.metadata().map(|m| m.len()).unwrap_or(0) } else { 0 };
+            let metadata = entry.metadata().ok();
+            let size = if file_type.is_file() { metadata.as_ref().map_or(0, fs::Metadata::len) } else { 0 };
             entries.push(DirEntryInfo {
                 name: entry.file_name().to_string_lossy().into_owned(),
                 is_dir: file_type.is_dir(),
                 size,
+                modified: metadata.and_then(|m| m.modified().ok()).map(OffsetDateTime::from),
             });
         }
         Ok(entries)
     }
 
     fn read(&self, path: &Path, limit: u64) -> Result<Vec<u8>, ViewError> {
+        Self::plain_file(path)?;
         read_limited(path, limit).map_err(|error| match error {
             ReadError::AccessDenied => ViewError::AccessDenied,
             ReadError::NotFound => ViewError::NotFound,
+            ReadError::TooLarge { .. } => ViewError::TooLarge,
+            ReadError::Locked => ViewError::Locked,
             other => ViewError::Failed(other.to_string()),
         })
+    }
+
+    fn open(&self, path: &Path) -> Result<Box<dyn ReadSeek + '_>, ViewError> {
+        Self::plain_file(path)?;
+        let file = open(path).map_err(|error| view_error(&error))?;
+        Ok(Box::new(BufReader::new(file)))
     }
 }
 
@@ -109,10 +177,33 @@ mod tests {
         assert_eq!(read_limited(&path, 3), Err(ReadError::TooLarge { size: 4, limit: 3 }));
         assert_eq!(read_limited(&dir.path().join("missing"), 10), Err(ReadError::NotFound));
         let listed = ReadOnlyFiles.list_dir(dir.path()).unwrap();
-        assert_eq!(listed, [DirEntryInfo { name: "a.vbs".into(), is_dir: false, size: 8 }]);
-        assert_eq!(
-            ReadOnlyFiles.read(&path, 2),
-            Err(ViewError::Failed(ReadError::TooLarge { size: 3, limit: 2 }.to_string()))
-        );
+        assert_eq!((listed[0].name.as_str(), listed[0].is_dir, listed[0].size), ("a.vbs", false, 8));
+        assert!(listed[0].modified.is_some());
+        assert_eq!(ReadOnlyFiles.read(&path, 2), Err(ViewError::TooLarge));
+        let mut content = String::new();
+        ReadOnlyFiles.open(&path).unwrap().read_to_string(&mut content).unwrap();
+        assert_eq!(content, "MsgBox 1");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn never_reads_devices_links_or_relative_paths() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("real.vbs"), "x").unwrap();
+        std::os::unix::fs::symlink(dir.path().join("real.vbs"), dir.path().join("link.vbs")).unwrap();
+        assert!(matches!(ReadOnlyFiles.read(&dir.path().join("link.vbs"), 10), Err(ViewError::Failed(_))));
+        assert!(matches!(ReadOnlyFiles.read(Path::new("relative.vbs"), 10), Err(ViewError::Failed(_))));
+        assert!(matches!(ReadOnlyFiles.read(Path::new("/dev/null"), 10), Err(ViewError::Failed(_))));
+        assert_eq!(ReadOnlyFiles.read(&dir.path().join("missing.vbs"), 10), Err(ViewError::NotFound));
+    }
+
+    #[test]
+    fn never_reads_network_paths() {
+        for path in [r"\\server\share\logon.vbs", "//server/share/x.bat", r"\\?\UNC\srv\share\x"] {
+            let path = Path::new(path);
+            assert_eq!(ReadOnlyFiles.read(path, 10), Err(ViewError::NetworkPath));
+            assert_eq!(ReadOnlyFiles.list_dir(path), Err(ViewError::NetworkPath));
+            assert!(matches!(ReadOnlyFiles.open(path), Err(ViewError::NetworkPath)));
+        }
     }
 }

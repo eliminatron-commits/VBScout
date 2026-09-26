@@ -1,5 +1,7 @@
-//! Phase 1 result: the collector writes an (empty) result file that is valid against the published
-//! schema (`docs/result.schema.json`), and the evaluation reads it.
+//! The collector writes a result file that is valid against the published schema
+//! (`docs/result.schema.json`), and the evaluation reads it. On Windows the scan includes the system
+//! sources of the machine running the test, so real task, registry, WMI and event log findings are
+//! validated as well.
 
 mod common;
 
@@ -13,6 +15,11 @@ fn schema_validator() -> jsonschema::Validator {
         serde_json::from_str(&fs::read_to_string(common::repo_root().join("docs/result.schema.json")).unwrap())
             .unwrap();
     jsonschema::options().should_validate_formats(true).build(&schema).expect("the schema itself is valid")
+}
+
+/// A path in a form that compares across `\\?\` prefixes, separators and case.
+fn comparable(path: &str) -> String {
+    path.trim_start_matches(r"\\?\").replace('\\', "/").to_lowercase()
 }
 
 #[test]
@@ -55,7 +62,19 @@ fn result_file_is_schema_valid_and_readable_by_the_evaluation() {
     let loaded = vbs_core::read_file(&path).unwrap();
     assert_eq!(loaded.unknown_values, 0);
     let result = loaded.result;
-    assert!(result.findings.is_empty(), "phase 1 has no finding modules yet");
+    // The negative collection holds nothing to report; findings can only come from the system
+    // sources (Windows), and the schema check above covers them.
+    let root = comparable(&scan.to_string_lossy());
+    let from_corpus: Vec<&str> = result
+        .findings
+        .iter()
+        .map(|finding| finding.location.path.as_str())
+        .filter(|path| comparable(path).starts_with(&root))
+        .collect();
+    assert!(from_corpus.is_empty(), "findings in the negative collection: {from_corpus:#?}");
+    if !cfg!(windows) {
+        assert!(result.findings.is_empty(), "no system sources outside Windows: {:#?}", result.findings);
+    }
     assert_eq!(result.scope.paths.len(), 1);
     assert!(!result.scope.local_drives);
     assert!(result.coverage.sources.iter().any(|source| source.source == "files.paths" && source.entries > 0));

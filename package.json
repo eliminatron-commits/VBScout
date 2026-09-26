@@ -16,7 +16,8 @@
     "check:i18n": "node scripts/check-i18n.mjs",
     "check:offline": "node scripts/check-offline.mjs",
     "check:readonly": "node scripts/check-readonly.mjs --self-test && node scripts/check-readonly.mjs",
-    "check:all": "npm run check:config && npm run check:i18n && npm run check:offline && npm run check:readonly && npm run check",
+    "check:imports": "node scripts/check-imports.mjs --self-test",
+    "check:all": "npm run check:config && npm run check:i18n && npm run check:offline && npm run check:readonly && npm run check:imports && npm run check",
     "sync:config": "node scripts/sync-config.mjs"
   },
   "dependencies": {
