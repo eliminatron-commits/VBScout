@@ -1,17 +1,18 @@
 //! The finding-type modules (see `vbs_core::module` for the interface).
 //!
 //! File-driven modules inspect what the walk finds: script files, scripts and shortcuts that
-//! start VBScript, installer packages and Group Policy script lists. System modules examine
-//! scheduled tasks, autostart entries, services, WMI subscriptions, logon scripts, installed
-//! packages and event logs through the read-only [`SystemView`]. Office macros follow in
-//! phase 3. Every module registered here is covered by the positive and negative collections
-//! in `tests/corpus/`.
+//! start VBScript, installer packages, Group Policy script lists and Office documents and Access
+//! databases with VBA macros. System modules examine scheduled tasks, autostart entries,
+//! services, WMI subscriptions, logon scripts, installed packages and event logs through the
+//! read-only [`SystemView`]. Every module registered here is covered by the positive and
+//! negative collections in `tests/corpus/`.
 
 mod autostart;
 mod event_logs;
 mod installer;
 mod invocations;
 mod logon_scripts;
+mod office_macros;
 mod script_files;
 mod services;
 mod shortcuts;
@@ -42,6 +43,7 @@ pub fn all() -> Vec<Box<dyn Module>> {
         Box::new(installer::InstallerPackages::default()),
         Box::new(event_logs::DeprecationAlerts),
         Box::new(event_logs::Sysmon),
+        Box::new(office_macros::OfficeMacros),
     ]
 }
 
@@ -368,5 +370,30 @@ pub(crate) mod testing {
         let mut report = Report::new();
         module.scan_system(&system, &mut report);
         report
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::testing::{MemoryFile, inspect};
+    use crate::analysis::servicing::tests::differential_bytes;
+
+    /// Windows servicing data (component store differentials, compressed payloads) under the name
+    /// of any file a module inspects is no finding – the real file is checked where it is used.
+    #[test]
+    fn servicing_data_is_no_finding_under_any_name() {
+        let mut payload = b"DCS\x01\x02\x00\x00\x00\x00\x40\x00\x00".to_vec();
+        payload.extend((0..64u8).map(|n| n.wrapping_mul(37)));
+        for module in super::all() {
+            for extension in module.extensions() {
+                for (label, bytes) in [("differential", differential_bytes()), ("payload", payload.clone())] {
+                    let path = format!(
+                        r"C:\Windows\WinSxS\amd64_example_31bf3856ad364e35_10.0.26100.1_none_0\r\file.{extension}"
+                    );
+                    let findings = inspect(module.as_ref(), &MemoryFile::new(&path, bytes));
+                    assert!(findings.is_empty(), "{} .{extension} {label}: {findings:?}", module.info().id);
+                }
+            }
+        }
     }
 }

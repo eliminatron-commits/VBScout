@@ -8,8 +8,8 @@
 //!
 //! * Every expected finding of `positive/` is reported and nothing else (recall 100 %).
 //! * `negative/` yields no finding at all – not even "not checkable".
-//! * Every rule a module can report has a positive case, and every finding type has a module –
-//!   types still without one are listed in `PENDING_KINDS`, which must be empty after phase 3.
+//! * Every rule a module can report has a positive case, and every finding type has a module
+//!   (`PENDING_KINDS` lists types still without one – empty since phase 3).
 
 mod common;
 
@@ -31,9 +31,8 @@ use vbs_core::views::{
     WmiValue,
 };
 
-/// Finding types without a module yet: phase 3 adds the Office macros; the list must be
-/// empty when the collector is complete.
-const PENDING_KINDS: &[FindingKind] = &[FindingKind::OfficeMacro];
+/// Finding types without a module yet – empty since phase 3 (Office macros): every type has one.
+const PENDING_KINDS: &[FindingKind] = &[];
 
 #[derive(Debug, Deserialize)]
 struct Expectations {

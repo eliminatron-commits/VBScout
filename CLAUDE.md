@@ -31,7 +31,8 @@ Two programs:
 | Network block test | Linux: `bash scripts/nettest/linux.sh [--gui] <out> -- <program> [args…]` · Windows (elevated pwsh): `scripts/nettest/windows.ps1 -Exe <exe> -Arguments … [-WebView]` |
 | Scan performance (DoD #5) | `cargo test --release -p vbs-collector --test performance -- --ignored --nocapture` (100,000 files < 10 min) |
 | System test with real Windows artefacts | elevated pwsh on a disposable machine: `scripts/systemtest/windows.ps1 -Exe <exe>`; limited scan without admin rights: `scripts/systemtest/nonadmin.ps1 -Exe <exe> -ScanPath <folder>` |
-| Test collection | `cargo test -p vbs-collector --test corpus`; print what `positive/` yields: `… -- --ignored --nocapture print_positive_cases`; binary fixtures: `python3 tests/corpus/make-binaries.py` (needs msitools, pylnk3) |
+| Test collection | `cargo test -p vbs-collector --test corpus`; print what `positive/` yields: `… -- --ignored --nocapture print_positive_cases`; binary fixtures: `python3 tests/corpus/make-binaries.py` (needs msitools, hivex, pylnk3, olefile; for Office files Java 17+, mdbtools, oletools, msoffcrypto-tool – `tests/corpus/office_fixtures.py`) |
+| Office readers vs. real files | `cargo test -p vbs-collector --test office_formats`; compare a folder of documents: `VBS_OFFICE_SAMPLES=<folder> cargo test -p vbs-collector --test office_formats -- --ignored --nocapture` |
 | Program size | `node scripts/check-size.mjs <exe> <maxMB>` (collector: 10) |
 | Program imports | `node scripts/check-imports.mjs <exe> [--out <list>]` – only reviewed Windows system DLLs, no C runtime, no network DLLs (`--self-test` in `check:all`) |
 | Propagate product.json | `npm run sync:config` |
@@ -44,7 +45,8 @@ CI (`.github/workflows/ci.yml`): checks (ubuntu) → Linux job (fmt, clippy, tes
 performance test, strace read-only trace and network test of the collector) and Windows jobs on windows-2025 and
 windows-2022 (clippy, tests, release build with static CRT, size and import check, performance test, ETW read-only trace,
 network block test, non-admin run, system test with artefacts made by Windows, full scan of the runner without
-internal errors; app build, smoke and network tests on 2025). Logs and results are uploaded as artifacts.
+internal errors and without findings for Windows servicing data or ESE databases; app build, smoke and network tests on
+2025). Logs and results are uploaded as artifacts.
 
 ## Layout
 
@@ -60,12 +62,15 @@ crates/
   vbs-collector/        collector CLI: cli, engine, walk, read_only (only way to open files), output (ONLY writer),
                         platform/{windows/,other.rs} (all OS calls: registry, event logs, WMI via COM),
                         analysis/ (format readers without I/O: command lines, markup, .lnk, .msi, .vbe, scripts.ini,
-                        event XML, registry hive files), modules/ (one file per finding type; Office macros in phase 3)
+                        event XML, registry hive files, VBA projects, Office documents, Access databases,
+                        Windows servicing data),
+                        modules/ (one file per finding type)
   vbs-evaluation/       evaluation logic without UI: import (phase 1); merge, de-dup, risk, effort, reports (phase 4)
   vbs-license/          license interface (offline only; Ed25519 format + org/MSP keys in phase 5)
 src-tauri/              Tauri shell (crate vbs-app): commands, smoke test, settings, tauri.conf.json, capabilities, icons
 src/                    Svelte 5 + TypeScript frontend (view only; talks to Rust via IPC)
-tests/corpus/           positive/ and negative/ collections incl. system/ fixtures + expected.json (DoD #4), make-binaries.py
+tests/corpus/           positive/ and negative/ collections incl. system/ and office/ fixtures + expected.json (DoD #4),
+                        make-binaries.py, office_fixtures.py + tools/OfficeFixtures.java, THIRD-PARTY.md (real Office files)
 scripts/                sync-config, check-i18n/offline/readonly/size (Node, no deps); nettest/, readonly/, systemtest/ (dynamic)
 docs/                   result-format.md, result.schema.json, examples/, research-notes.md (sources with dates)
 ```
@@ -86,7 +91,9 @@ Later phases add: `worker/` + `tools/` license keys (5), `packaging/` winget + i
   services, WMI, logon scripts, 4xx MSI, 5xx event logs, 6xx Office macros, 9xx security; `x00` = "could not be
   checked" of that range (the finding states the actual kind, e.g. `VBS-200` for a shortcut). Within a range each kind
   has a decade: `x1` = runs VBScript (`breaks`), `x2` = starts a script of unknown language (`review`), e.g. 301/302
-  tasks, 311/312 autostart, 321/322 services, 331/332 WMI, 341/342 logon scripts. Texts: `rule.vbs101.title` /
+  tasks, 311/312 autostart, 321/322 services, 331/332 WMI, 341/342 logon scripts. Office macros (one kind) have a
+  decade per mechanism: 601 VBScript regular expressions, 611/612 script engines (Script Control, `execScript`),
+  621/622 starting scripts, 632 Windows Script Host objects (`review` only). Texts: `rule.vbs101.title` /
   `.rationale`.
 - Coverage source IDs: `files.localDrives`, `files.paths`, `files.networkPaths`, `<area>.<name>` for system sources
   (`tasks.scheduled`, `autostart.entries`, `services.configuration`, `wmi.subscriptions`, `policies.scripts`,
@@ -130,6 +137,19 @@ Later phases add: `worker/` + `tools/` license keys (5), `packaging/` winget + i
    profile's `NTUSER.DAT` is read as a file (`analysis/regf.rs`); if that fails, the autostart source is `partial`
    (`userHivesNotRead`). Installer packages are read as compound files
    (`cfb` crate), scripts decoded from UTF-8/UTF-16/ANSI, `.vbe` decoded (reversible Script Encoder substitution).
+   Windows servicing data under a candidate's name – component store differentials (`WinSxS\…\f\`, `r\`, `n\`;
+   MSDelta `PA30`/`PA31`) and compressed payloads (`DCN`/`DCS`/`DCD`/`DCM` v1) – is recognised by content and is no
+   finding (`analysis/servicing.rs`): the real file is checked where Windows puts it. Files are never skipped by path.
+   **Office macros** (`analysis/office.rs`, `ovba.rs`, `jet.rs`, `vba.rs`): documents are recognised by content
+   (compound file, Open XML package, Access database; RTF/HTML/CSV exports, lock files and Windows' ESE databases named
+   `.mdb` – User Access Logging – are no finding), every VBA
+   project is found – including embedded objects and Access 97–2016 system tables – and its source decompressed
+   ([MS-OVBA]). Reported: `VBScript.RegExp` and references to `vbscript.dll` (601), the Script Control and `execScript`
+   by language (611/612), commands in string literals (joined across `&`, analysed like other commands; a bare `.vbs` path only where
+   the line starts something) (621/622), WSH objects (632); the Scripting Runtime and JScript are not findings. A
+   project "locked for viewing" is read (its source is not encrypted); a password to open, rights management, compiled
+   code without source and unsupported formats (Access 97, Excel 5.0/95 module sheets, `ActiveMime`) are
+   `notCheckable`.
 6. **Result file** (`docs/result-format.md`): ZIP with `mimetype` + `result.json`, versioned schema with JSON Schema,
    open enumerations (unknown values kept, unknown classification = review), migrations for breaking changes,
    limits against malicious files, deterministic finding order. Coverage is recorded per source with limitations
@@ -173,5 +193,6 @@ Later phases add: `worker/` + `tools/` license keys (5), `packaging/` winget + i
 - Classifying a rule as `breaks` without a source; timeline claims without source and date or without "expected".
 - Gating licensed features only in the UI.
 - Platform APIs outside `crates/vbs-collector/src/platform/`; `unsafe` outside `platform/windows/`; msi.dll (MSI
-  packages are parsed as files).
+  packages are parsed as files); Office automation, OLE or the Access database engine (documents and databases are
+  parsed as files).
 - Committing secrets (Paddle keys, license signing key – Cloudflare Worker secret only).

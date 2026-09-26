@@ -41,7 +41,7 @@ fn looks_like_utf16le(bytes: &[u8]) -> bool {
 }
 
 /// Windows-1252 (0x80–0x9F differ from Latin-1; undefined bytes keep their code point).
-fn windows_1252(byte: u8) -> char {
+pub(crate) fn windows_1252(byte: u8) -> char {
     const HIGH: [char; 32] = [
         '€', '\u{81}', '‚', 'ƒ', '„', '…', '†', '‡', 'ˆ', '‰', 'Š', '‹', 'Œ', '\u{8d}', 'Ž', '\u{8f}', '\u{90}', '‘',
         '’', '“', '”', '•', '–', '—', '˜', '™', 'š', '›', 'œ', '\u{9d}', 'ž', 'Ÿ',

@@ -6,7 +6,7 @@ use vbs_core::module::{CREDENTIAL_RULE, CandidateFile, Module, ModuleInfo, Repor
 
 use super::{file_activation, read_error};
 use crate::analysis::command::{self, Usage};
-use crate::analysis::lnk;
+use crate::analysis::{lnk, servicing};
 
 pub struct Shortcuts;
 
@@ -48,6 +48,9 @@ impl Module for Shortcuts {
                 return;
             }
         };
+        if servicing::is_servicing_data(&bytes) {
+            return; // a differential of the component store, not a shortcut
+        }
         let link = match lnk::parse(&bytes) {
             Ok(link) => link,
             Err(lnk::LinkError::Corrupt(what)) => {

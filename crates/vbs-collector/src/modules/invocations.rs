@@ -7,7 +7,7 @@ use vbs_core::module::{CREDENTIAL_RULE, CandidateFile, Module, ModuleInfo, Repor
 use super::{MAX_SCRIPT_BYTES, file_activation, file_credentials};
 use crate::analysis::command::{self, Usage};
 use crate::analysis::script::{self, Language};
-use crate::analysis::text;
+use crate::analysis::{servicing, text};
 
 pub struct Invocations;
 
@@ -42,6 +42,9 @@ impl Module for Invocations {
                 return;
             }
         };
+        if servicing::is_servicing_data(&bytes) {
+            return; // a differential of the component store, not a script
+        }
         let language = match file.extension() {
             "ps1" => Language::PowerShell,
             "kix" => Language::KiXtart,

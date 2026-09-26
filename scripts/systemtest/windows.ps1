@@ -17,6 +17,11 @@
     * a script encoded by Microsoft's Script Encoder (Scripting.Encoder), where available,
     * the hive file of a user who is not logged on (NTUSER.DAT written by `reg save`, registered
       in ProfileList) with a Run value,
+    * an Office Open XML workbook written by Microsoft's packaging code (System.IO.Packaging, or
+      .NET's ZipArchive) around a VBA project that uses VBScript regular expressions (the project
+      from the test collection),
+    * an Access database created by Windows' own Jet engine (32-bit ADOX), which must be read
+      without a finding, where the Jet provider exists,
     * the VBScript deprecation alert (event 4096), if this Windows build logs it.
 
   It then runs the collector (system sources + the test folder), reads the result file and checks
@@ -137,6 +142,69 @@ try {
   New-Item -Path $profileList -Force | Out-Null
   New-ItemProperty -Path $profileList -Name ProfileImagePath -Value $offlineProfile -PropertyType ExpandString -Force | Out-Null
 
+  # Office Open XML workbook written by Microsoft's packaging code (System.IO.Packaging, else .NET's
+  # ZipArchive with the package parts), with the VBA project of the test collection's regexp-late.xlsm.
+  Add-Type -AssemblyName System.IO.Compression
+  Add-Type -AssemblyName System.IO.Compression.FileSystem
+  $sample = [IO.Compression.ZipFile]::OpenRead((Join-Path $PSScriptRoot '..\..\tests\corpus\positive\office\regexp-late.xlsm'))
+  try {
+    $stream = $sample.GetEntry('xl/vbaProject.bin').Open()
+    $vba = [IO.MemoryStream]::new()
+    $stream.CopyTo($vba)
+    $stream.Dispose()
+  } finally { $sample.Dispose() }
+  $packagedPath = Join-Path $scan 'windows-packaged.xlsm'
+  $workbookXml = [Text.Encoding]::UTF8.GetBytes('<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>')
+  try {
+    Add-Type -AssemblyName WindowsBase
+    $package = [IO.Packaging.Package]::Open($packagedPath, [IO.FileMode]::Create)
+    try {
+      $workbook = $package.CreatePart([Uri]::new('/xl/workbook.xml', [UriKind]::Relative), 'application/vnd.ms-excel.sheet.macroEnabled.main+xml')
+      $workbook.GetStream().Write($workbookXml, 0, $workbookXml.Length)
+      $package.CreateRelationship($workbook.Uri, [IO.Packaging.TargetMode]::Internal, 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument') | Out-Null
+      $vbaPart = $package.CreatePart([Uri]::new('/xl/vbaProject.bin', [UriKind]::Relative), 'application/vnd.ms-office.vbaProject')
+      $vba.Position = 0
+      $vba.CopyTo($vbaPart.GetStream())
+      $workbook.CreateRelationship([Uri]::new('vbaProject.bin', [UriKind]::Relative), [IO.Packaging.TargetMode]::Internal, 'http://schemas.microsoft.com/office/2006/relationships/vbaProject') | Out-Null
+    } finally { $package.Close() }
+    $notes.Add('workbook package written by System.IO.Packaging')
+  } catch {
+    Remove-Item -LiteralPath $packagedPath -ErrorAction SilentlyContinue
+    $archive = [IO.Compression.ZipFile]::Open($packagedPath, [IO.Compression.ZipArchiveMode]::Create)
+    try {
+      $parts = [ordered]@{
+        '[Content_Types].xml' = '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="bin" ContentType="application/vnd.ms-office.vbaProject"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.ms-excel.sheet.macroEnabled.main+xml"/></Types>'
+        '_rels/.rels' = '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'
+        'xl/_rels/workbook.xml.rels' = '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.microsoft.com/office/2006/relationships/vbaProject" Target="vbaProject.bin"/></Relationships>'
+      }
+      foreach ($name in $parts.Keys) {
+        $writer = [IO.StreamWriter]::new($archive.CreateEntry($name).Open())
+        $writer.Write($parts[$name])
+        $writer.Dispose()
+      }
+      $entry = $archive.CreateEntry('xl/workbook.xml').Open()
+      $entry.Write($workbookXml, 0, $workbookXml.Length)
+      $entry.Dispose()
+      $entry = $archive.CreateEntry('xl/vbaProject.bin').Open()
+      $vba.Position = 0
+      $vba.CopyTo($entry)
+      $entry.Dispose()
+    } finally { $archive.Dispose() }
+    $notes.Add("workbook package written by ZipArchive (System.IO.Packaging: $($_.Exception.Message))")
+  }
+
+  # Access database created by Windows' own Jet engine (32-bit only), where the provider exists.
+  $jetPath = Join-Path $scan 'windows-jet.mdb'
+  $powershell32 = Join-Path $env:WINDIR 'SysWOW64\WindowsPowerShell\v1.0\powershell.exe'
+  $jetMade = $false
+  if (Test-Path $powershell32) {
+    $jetOutput = & $powershell32 -NoProfile -NonInteractive -Command "`$c = New-Object -ComObject ADOX.Catalog; `$c.Create('Provider=Microsoft.Jet.OLEDB.4.0;Data Source=$jetPath') | Out-Null; `$c.ActiveConnection.Execute('CREATE TABLE Orders (Id INTEGER, Customer TEXT(50))') | Out-Null; `$c.ActiveConnection.Close()" 2>&1
+    $jetMade = Test-Path $jetPath
+    if ($jetMade) { $notes.Add('Access database created by the Jet engine (ADOX)') } else { $notes.Add("Jet provider not available: $jetOutput") }
+  } else {
+    $notes.Add('no 32-bit PowerShell for the Jet provider')
+  }
+
   # Script encoded by Microsoft's Script Encoder, if the object exists on this Windows.
   $encoded = $false
   try {
@@ -195,6 +263,11 @@ try {
     if ($json -like '*EncodedSecret42*') { $failures.Add('the encoded script''s secret appears in the result file') }
   }
   if ($alerts.Count) { Expect 'deprecation alert (VBS-501)' { $_.rule -eq 'VBS-501' } }
+  Expect 'System.IO.Packaging workbook with VBScript RegExp (VBS-601)' { $_.rule -eq 'VBS-601' -and $_.location.path -like '*windows-packaged.xlsm' -and $_.location.item -eq 'Module1' }
+  if ($jetMade) {
+    $jetFindings = @($findings | Where-Object { $_.location.path -like '*windows-jet.mdb' })
+    if ($jetFindings.Count) { $failures.Add("Jet-made database: unexpected findings $(($jetFindings | ForEach-Object { "$($_.rule)/$($_.reason)" }) -join ', ')") }
+  }
   $internal = @($findings | Where-Object { $_.reason -eq 'internalError' })
   if ($internal.Count) { $failures.Add("internal errors: $(($internal | ForEach-Object { $_.location.path }) -join ', ')") }
   $failedSources = @($scanResult.coverage.sources | Where-Object { $_.status -eq 'failed' })

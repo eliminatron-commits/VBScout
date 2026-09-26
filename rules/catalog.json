@@ -116,6 +116,42 @@
       "checked": "2026-09-26"
     },
     {
+      "id": "ms-vba-vbscript",
+      "publisher": "Microsoft",
+      "title": "Prepare your VBA projects for VBScript deprecation in Windows (Microsoft 365 Developer Blog)",
+      "url": "https://devblogs.microsoft.com/microsoft365dev/how-to-prepare-vba-projects-for-vbscript-deprecation/",
+      "published": "2025-09-10",
+      "checked": "2026-09-26"
+    },
+    {
+      "id": "ms-script-control",
+      "publisher": "Microsoft",
+      "title": "Adding a ScriptControl (Visual Basic 6.0 documentation)",
+      "url": "https://learn.microsoft.com/en-us/previous-versions/visualstudio/visual-studio-6.0/aa227400(v=vs.60)",
+      "checked": "2026-09-26"
+    },
+    {
+      "id": "ms-execscript",
+      "publisher": "Microsoft",
+      "title": "execScript method (Internet Explorer platform APIs)",
+      "url": "https://learn.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/platform-apis/aa741364(v=vs.85)",
+      "checked": "2026-09-26"
+    },
+    {
+      "id": "ms-ovba",
+      "publisher": "Microsoft",
+      "title": "[MS-OVBA]: Office VBA File Format Structure",
+      "url": "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-ovba/575462ba-bf67-4190-9fac-c275523c75fc",
+      "checked": "2026-09-26"
+    },
+    {
+      "id": "ms-offcrypto",
+      "publisher": "Microsoft",
+      "title": "[MS-OFFCRYPTO]: Office Document Cryptography Structure",
+      "url": "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-offcrypto/3c34d72a-1a61-4b52-a893-196f9157f083",
+      "checked": "2026-09-26"
+    },
+    {
       "id": "mitre-cwe-798",
       "publisher": "MITRE",
       "title": "CWE-798: Use of Hard-coded Credentials",
@@ -262,6 +298,34 @@
       "classification": "review",
       "sources": ["ms-vbscript-detection", "ms-sysmon"]
     },
+
+    { "id": "VBS-600", "kind": "officeMacro", "classification": "review", "sources": ["ms-vba-vbscript", "ms-offcrypto", "ms-ovba"] },
+    {
+      "id": "VBS-601",
+      "kind": "officeMacro",
+      "classification": "breaks",
+      "sources": ["ms-vba-vbscript", "ms-vbscript-timeline"]
+    },
+    {
+      "id": "VBS-611",
+      "kind": "officeMacro",
+      "classification": "breaks",
+      "sources": ["ms-script-control", "ms-execscript", "ms-deprecated-features", "ms-vbscript-timeline"]
+    },
+    { "id": "VBS-612", "kind": "officeMacro", "classification": "review", "sources": ["ms-script-control", "ms-execscript"] },
+    {
+      "id": "VBS-621",
+      "kind": "officeMacro",
+      "classification": "breaks",
+      "sources": ["ms-vba-vbscript", "ms-wscript-command", "ms-vbscript-timeline"]
+    },
+    {
+      "id": "VBS-622",
+      "kind": "officeMacro",
+      "classification": "review",
+      "sources": ["ms-wsh-script-element", "ms-hta"]
+    },
+    { "id": "VBS-632", "kind": "officeMacro", "classification": "review", "sources": ["ms-vba-vbscript", "ms-vbscript-timeline"] },
 
     { "id": "VBS-901", "kind": "hardcodedCredential", "classification": "review", "sources": ["mitre-cwe-798"] }
   ]

@@ -14,6 +14,7 @@ use vbs_core::views::{Bitness, Hive, SystemView, ViewError};
 use super::{read_error, view_reason};
 use crate::analysis::msi::{self, Package, ScriptAction, SourceKind};
 use crate::analysis::script::{self, Language};
+use crate::analysis::servicing;
 
 #[derive(Default)]
 pub struct InstallerPackages {
@@ -58,6 +59,7 @@ impl Module for InstallerPackages {
         };
         match package {
             Ok(package) => report_package(report, &package, file.location(), Some(file.facts()), &[]),
+            Err(_) if servicing_data(file) => {} // a differential of the component store, not a package
             Err(error) => report
                 .not_checkable("VBS-400", file.location(), NotCheckableReason::Corrupt)
                 .file(file.facts())
@@ -227,6 +229,12 @@ fn target(action: &ScriptAction) -> Option<String> {
         SourceKind::Property => format!("Property.{source}"),
         SourceKind::Inline => return None,
     })
+}
+
+/// Whether a file that is no valid package is Windows servicing data ([`servicing`]).
+fn servicing_data(file: &dyn CandidateFile) -> bool {
+    let mut head = [0u8; 16];
+    file.open().is_ok_and(|mut reader| reader.read_exact(&mut head).is_ok()) && servicing::is_servicing_data(&head)
 }
 
 fn same_path(a: &Path, b: &Path) -> bool {

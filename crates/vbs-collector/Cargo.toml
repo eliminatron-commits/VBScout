@@ -23,6 +23,8 @@ uuid.workspace = true
 vbs-config.workspace = true
 vbs-core.workspace = true
 vbs-i18n.workspace = true
+# Office Open XML packages (.xlsm, .docm, …) – already part of the collector through vbs-core.
+zip.workspace = true
 
 # Read-only Win32 APIs only – scripts/check-readonly.mjs lists what may be used.
 # `windows` (COM) is needed for WMI instance queries; everything else uses windows-sys.
@@ -52,7 +54,6 @@ serde.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true
 vbs-evaluation.workspace = true
-zip.workspace = true
 
 [lints]
 workspace = true

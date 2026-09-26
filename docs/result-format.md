@@ -77,8 +77,17 @@ starts is reported as `notCheckable` with reason `networkLocation`.
 | `logonScript` | `phase`, `policyName`, `offlineHive` |
 | `msiCustomAction` | `customActionType`, `scriptSource`, `scheduled`, `continueOnError`, `condition`, `productName`, `productVersion`, `publisher`, `packagePath` |
 | `eventLogUsage` | `events`, `firstSeen`, `lastSeen`, `processTree`, `image`, `parentImage` |
+| `officeMacro` | `container` (`compoundFile`, `openXml`, `accessDatabase`, `other`), `project` (VBA project name), `embedded` (embedded object holding the project, e.g. `ObjectPool/_1234`), `projectLocked` (locked for viewing – the code was read anyway), `projectUnviewable`, `documentEncrypted` (binary document with a password to open; its VBA storage is not encrypted), `autoMacro` (a procedure Office runs by itself, e.g. `Workbook_Open`), `loadsAtStartup` (in `XLSTART`, Word's `STARTUP` folder or `Normal.dotm`), `via` (how a script is started); not checkable: `encryption` (`agile`, `standard`, `extensible`, `rightsManagement`, `database`), `modulesUnreadable`, `modules` |
 | `hardcodedCredential` | `secrets` (count), `secretKinds` (`password`, `connectionString`, `urlCredentials`) |
-| `notCheckable` findings of read formats (`shortcut`, `msiCustomAction`) | `readError` – why the reader gave up, at most 120 characters (e.g. `link info`, `no string pool`, `not a regular file`); never file contents |
+| `notCheckable` findings of read formats (`shortcut`, `msiCustomAction`, `officeMacro`) | `readError` – why the reader gave up, at most 120 characters (e.g. `link info`, `no string pool`, `not a regular file`, `encrypted package (agile)`); never file contents |
+
+Office macro findings (`officeMacro`) have the document as `location.path` and the VBA module as `location.item`
+(`Module1`; a reference of the project: `References/VBScript_RegExp_55`; a module of an embedded object:
+`ObjectPool/_1234/Module1`). Evidence line numbers are those the VBA editor shows (the hidden `Attribute` lines are
+not counted). A project whose modules cannot be read, and a document that cannot be read at all (password to open,
+rights management, damaged, a format that is not read such as Access 97 or Excel 5.0/95 module sheets), is reported
+as `VBS-600` (`notCheckable`); `location.item` then names where the project is stored (`_VBA_PROJECT_CUR`, `Macros`,
+`xl/vbaProject.bin`, `MSysAccessStorage/VBA/VBAProject`).
 
 ## Privacy and security invariants (enforced when writing)
 

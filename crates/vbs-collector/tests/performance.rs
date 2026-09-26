@@ -1,8 +1,9 @@
 //! Definition of Done #5 (file part): 100,000 files are scanned in under 10 minutes.
 //!
 //! Creates 100,000 files in 1,000 folders – ordinary files plus candidates of every file
-//! module (scripts, shortcuts, batch/PowerShell, installer packages) – and runs a complete
-//! file scan with all modules. Runs in CI in release mode:
+//! module (scripts, shortcuts, batch/PowerShell, installer packages, Office documents with and
+//! without macros, Access databases) – and runs a complete file scan with all modules. Runs in
+//! CI in release mode:
 //! `cargo test --release -p vbs-collector --test performance -- --ignored --nocapture`
 
 mod common;
@@ -52,6 +53,11 @@ fn scans_100_000_files_in_under_10_minutes() {
         ("ps1", "invocations/deploy.ps1"),
         ("msi", "installer/legacy-inventory.msi"),
         ("hta", "scripts/admin-console.hta"),
+        ("xlsm", "office/regexp-late.xlsm"),
+        ("xls", "office/starts-vbscript.xls"),
+        ("docm", "office/script-control.docm"),
+        ("mdb", "office/access/legacy-2000.mdb"),
+        ("doc", "../negative/office/real/poi-60279-offset.doc"),
     ]
     .into_iter()
     .map(|(extension, path)| (extension, fs::read(corpus.join(path)).unwrap()))

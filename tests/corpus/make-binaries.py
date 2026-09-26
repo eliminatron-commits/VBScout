@@ -4,11 +4,14 @@
 The files are committed; run this script only to recreate or change them. Shortcuts and
 installer packages are written by independent implementations – pylnk3 and msitools
 (libmsi) – so the collector's readers are tested against files it did not write itself.
+Office documents and Access databases: `office_fixtures.py` (real files made by Office, and
+VBA projects placed by Apache POI and Jackcess, read back with oletools and Apache POI).
 The Windows CI job additionally checks shortcuts and packages made by Windows itself
 (scripts/systemtest/windows.ps1).
 
 Requirements: python3, msitools (`msibuild`, `msiinfo`), hivex (`hivexsh`), pylnk3 and olefile
-(`pip install pylnk3 olefile`).
+(`pip install pylnk3 olefile`); for the Office files also Java 17+, mdbtools, oletools and
+msoffcrypto-tool (see office_fixtures.py).
 Registry hives start from hivex's empty test hive ("images/minimal", downloaded when needed, or
 given with VBS_MINIMAL_HIVE=<file>); hivexsh adds the keys and values.
 Usage: python3 tests/corpus/make-binaries.py
@@ -300,10 +303,54 @@ def utf16_files():
 ''')
 
 
+# --- Windows' own data under the names of scripts, shortcuts, packages and databases ------
+# Seen on real Windows (CI full scans): differentials of the component store (WinSxS\…\f\, r\,
+# n\; MSDelta "PA30" behind a CRC-32), compressed payloads of components that are not installed
+# ("DCS"/"DCN", version 1) and ESE databases named .mdb (User Access Logging). Microsoft's files
+# cannot be redistributed, so these are synthetic: the documented headers, deterministic bodies.
+
+def windows_data():
+    import struct
+    import zlib
+
+    def body(seed, size):
+        return bytes((seed * 131 + n * 197 + (n >> 3)) & 0xFF for n in range(size))
+
+    def differential(seed):
+        delta = b'PA30' + struct.pack('<Q', 0x01DB2F3C4A5B6C7D + seed) + body(seed, 180)
+        return struct.pack('<I', zlib.crc32(delta)) + delta
+
+    def payload(kind, seed):
+        return b'DC' + kind + b'\x01' + struct.pack('<II', 1, 4096) + body(seed, 240)
+
+    sxs = 'negative/system/Windows/WinSxS/'
+    files = {
+        sxs + 'amd64_microsoft-windows-security-spp-tools_31bf3856ad364e35_10.0.26100.1_none_91938b3e66db829b/r/slmgr.vbs':
+            differential(1),
+        sxs + 'amd64_microsoft.windows.powershell.common_31bf3856ad364e35_10.0.26100.1_none_7cdc2287c2f1d46b/r/Windows PowerShell.lnk':
+            differential(2),
+        sxs + 'amd64_microsoft-windows-winrm-winrscmd_31bf3856ad364e35_10.0.26100.1_none_1c3e8a4f0b2d6e7a/f/winrm.cmd':
+            differential(3),
+        sxs + 'amd64_microsoft.powershell.dsc.pullserver_31bf3856ad364e35_10.0.26100.1_none_e25df1b635c8451d/Devices.mdb':
+            payload(b'S', 4),
+        sxs + 'amd64_microsoft-windows-example-setup_31bf3856ad364e35_10.0.26100.1_none_0d4c8b2a6e1f3957/setup.msi':
+            payload(b'N', 5),
+        # ESE database header: checksum, signature 0x89ABCDEF, format version 0x620.
+        'negative/system/Windows/System32/LogFiles/Sum/SystemIdentity.mdb':
+            struct.pack('<IIII', 0x9E1F5A3C, 0x89ABCDEF, 0x620, 0) + bytes(8192 - 16),
+    }
+    for name, data in files.items():
+        with open(path(*name.split('/')), 'wb') as f:
+            f.write(data)
+
+
 if __name__ == '__main__':
+    import office_fixtures
     vbe()
     shortcuts()
     packages()
     hives()
     utf16_files()
+    windows_data()
+    office_fixtures.generate()
     print('binary fixtures written')

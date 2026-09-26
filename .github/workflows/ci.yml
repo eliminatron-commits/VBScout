@@ -213,6 +213,22 @@ jobs:
             ForEach-Object { '{0} {1} {2} {3} {4}' -f $_.rule, $_.reason, $_.location.path, $_.details.packagePath, $_.details.readError }
           $internal = @($findings | Where-Object { $_.reason -eq 'internalError' })
           if ($internal.Count) { $internal | ConvertTo-Json -Depth 6; throw "$($internal.Count) internal errors" }
+          # Windows' own data under the names of scripts, shortcuts, packages and databases is no finding:
+          # differentials and compressed payloads of the component store (also in container image layers),
+          # ESE databases of User Access Logging. Anything left is shown with its first bytes.
+          $windowsData = @($findings | Where-Object {
+            $_.location.path -match '\\WinSxS\\[^\\]+\\[fnr]\\' -or
+            ($_.reason -eq 'corrupt' -and $_.location.path -match '\\(WinSxS|LogFiles\\Sum)\\')
+          })
+          foreach ($finding in $windowsData) {
+            $head = ''
+            try {
+              $stream = [IO.File]::Open($finding.location.path, 'Open', 'Read', 'ReadWrite, Delete')
+              try { $bytes = [byte[]]::new(16); $head = [BitConverter]::ToString($bytes, 0, $stream.Read($bytes, 0, 16)) } finally { $stream.Dispose() }
+            } catch { $head = $_.Exception.Message }
+            '{0} {1} {2}: {3}' -f $finding.rule, $finding.reason, $finding.location.path, $head
+          }
+          if ($windowsData.Count) { throw "$($windowsData.Count) findings for Windows servicing data or ESE databases" }
 
       - name: Upload trace logs
         if: always()
