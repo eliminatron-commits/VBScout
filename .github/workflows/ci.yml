@@ -40,6 +40,10 @@ jobs:
         run: npm run check:imports
       - name: Svelte / TypeScript
         run: npm run check
+      - name: Key service (Worker tests; its keys verify in Rust – fixture current)
+        run: npm run check:worker
+      - name: Packaging (winget templates; open items before a public release)
+        run: npm run check:packaging
 
   linux:
     name: Linux (development platform) – tests, read-only and network traces
@@ -152,10 +156,10 @@ jobs:
       - name: Build collector (release, static CRT)
         id: collector
         run: cargo build --release --locked -p vbs-collector
-      - name: Build evaluation app (release)
+      - name: Build evaluation app (release, with NSIS installer)
         id: app
         if: matrix.os == 'windows-2025'
-        run: npx tauri build --no-bundle
+        run: npx tauri build --bundles nsis
 
       # The checks below are independent of each other: each runs once its program is built, even
       # if an earlier check failed, so one run reports all of them (the job fails if any fails).
@@ -207,6 +211,15 @@ jobs:
         if: ${{ !cancelled() && steps.app.outcome == 'success' }}
         shell: pwsh
         run: ./scripts/nettest/windows.ps1 -Exe target\release\vbs-app.exe -Arguments '--smoke-test=90' -WebView -OutDir nettest-out
+      - name: Release files (collector, installer, portable app, checksums, winget manifests)
+        id: package
+        if: ${{ !cancelled() && steps.app.outcome == 'success' && steps.collector.outcome == 'success' }}
+        shell: pwsh
+        run: ./scripts/release/package.ps1 -SkipBuild -OutDir dist-release
+      - name: Installer installs silently, the installed app starts, uninstalls cleanly
+        if: ${{ !cancelled() && steps.package.outcome == 'success' }}
+        shell: pwsh
+        run: ./scripts/release/installer-test.ps1 -Setup (Get-ChildItem dist-release\*-setup.exe).FullName
 
       - name: Collector runs without installation (full scan of this machine)
         if: ${{ !cancelled() && steps.collector.outcome == 'success' }}
@@ -294,4 +307,11 @@ jobs:
             target/release/vbs-collector.exe
             target/release/vbs-app.exe
             collector-out/
+          retention-days: 14
+      - name: Upload release files (development build, unsigned)
+        if: ${{ !cancelled() && steps.package.outcome == 'success' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-files-windows-x64
+          path: dist-release/
           retention-days: 14

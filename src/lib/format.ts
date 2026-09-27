@@ -31,6 +31,18 @@ export function formatDate(iso: string, withTime = true): string {
   return new Intl.DateTimeFormat(language(), options).format(date);
 }
 
+/** A calendar day (YYYY-MM-DD) without time-zone shift, e.g. the last day of a license. */
+export function formatDay(day: string): string {
+  const date = new Date(`${day}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return day;
+  return new Intl.DateTimeFormat(language(), { dateStyle: 'medium', timeZone: 'UTC' }).format(date);
+}
+
+/** A price from product.json (minor units) in the UI language. */
+export function formatPrice(amountMinor: number, currency: string): string {
+  return new Intl.NumberFormat(language(), { style: 'currency', currency, maximumFractionDigits: amountMinor % 100 ? 2 : 0 }).format(amountMinor / 100);
+}
+
 /** Title of a rule; rules from newer versions show their ID. */
 export function ruleKey(rule: string, part: 'title' | 'rationale'): string {
   return `rule.${rule.toLowerCase().replace('-', '')}.${part}`;

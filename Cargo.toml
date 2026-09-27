@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/*", "src-tauri"]
+members = ["crates/*", "src-tauri", "tools/*"]
 
 [workspace.package]
 version = "0.1.0"
@@ -21,7 +21,10 @@ vbs-license = { path = "crates/vbs-license" }
 # (checked by scripts/check-offline.mjs and clippy.toml); the collector must
 # additionally stay read-only (scripts/check-readonly.mjs).
 # OLE compound files (MSI packages; Office documents in phase 3), read through a read-only handle.
+# License keys (vbs-license): base64url text and Ed25519 signatures (RFC 8032), verified offline.
+base64 = "0.22"
 cfb = "0.10"
+ed25519-dalek = { version = "2", default-features = false, features = ["std", "zeroize"] }
 jsonschema = { version = "0.58", default-features = false }
 # Management PDF of the evaluation: text with an embedded, subset font (shaping via rustybuzz,
 # which also measures text for line breaks) and PNG/JPEG logos. Pure Rust, no network.

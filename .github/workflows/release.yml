@@ -1,0 +1,87 @@
+name: Release
+
+# Builds the release files for Windows x64 and attaches them to a draft GitHub release.
+# Start: push a tag v<version> (after CI is green for that commit), or run manually for a trial build
+# (manual runs never create a release, they only upload the files as an artifact).
+#
+# Code signing is prepared: with the secrets VBS_SIGN_CERT_BASE64 (PFX, base64) and
+# VBS_SIGN_CERT_PASSWORD the collector, the app and the installer are signed (scripts/release/sign.ps1);
+# without them the files stay unsigned and the run shows a warning.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  NODE_VERSION: '24'
+
+jobs:
+  windows:
+    name: Release files (Windows x64)
+    runs-on: windows-2025
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+
+      - name: Release configuration complete (public key, no placeholders, tag = version)
+        if: startsWith(github.ref, 'refs/tags/')
+        run: node scripts/release/check-release.mjs --tag ${{ github.ref_name }}
+      - name: Release configuration (trial build – open items only listed)
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        run: node scripts/release/check-release.mjs --warn
+      - name: Static checks (configuration, translations, offline and read-only policy)
+        run: npm run check:all
+
+      - name: Rust toolchain (rust-toolchain.toml)
+        shell: bash
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustc --version
+
+      - name: Build and package (collector, installer, portable app, checksums, winget manifests)
+        shell: pwsh
+        env:
+          VBS_SIGN_CERT_BASE64: ${{ secrets.VBS_SIGN_CERT_BASE64 }}
+          VBS_SIGN_CERT_PASSWORD: ${{ secrets.VBS_SIGN_CERT_PASSWORD }}
+        run: ./scripts/release/package.ps1 -OutDir dist-release
+
+      - name: Collector below 10 MB and only Windows system libraries
+        run: |
+          node scripts/check-size.mjs (Get-ChildItem dist-release\*-Collector-*.exe).FullName 10
+          node scripts/check-imports.mjs (Get-ChildItem dist-release\*-Collector-*.exe).FullName
+      - name: Released app starts (smoke test)
+        shell: pwsh
+        run: |
+          $exe = (Get-ChildItem dist-release\*-portable.exe).FullName
+          $p = Start-Process -FilePath $exe -ArgumentList '--smoke-test=90' -PassThru
+          $null = $p.Handle
+          if (-not $p.WaitForExit(150000)) { $p.Kill(); throw 'smoke test timed out' }
+          if ($p.ExitCode -ne 0) { throw "smoke test failed with exit code $($p.ExitCode)" }
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-windows-x64
+          path: dist-release/
+          retention-days: 30
+
+      - name: Draft GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" --draft --verify-tag --title "${{ github.ref_name }}" `
+            --notes "Release files for Windows x64 – see README.md. Checksums: *SHA256SUMS.txt." `
+            (Get-ChildItem dist-release -File).FullName

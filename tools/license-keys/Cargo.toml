@@ -1,0 +1,23 @@
+[package]
+name = "license-keys"
+description = "Vendor tool: create the license signing key, issue and inspect license keys (offline)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+ed25519-dalek.workspace = true
+base64.workspace = true
+getrandom = "0.3"
+lexopt.workspace = true
+time.workspace = true
+vbs-config.workspace = true
+vbs-license = { workspace = true, features = ["issue"] }
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

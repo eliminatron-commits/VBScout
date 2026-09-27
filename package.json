@@ -17,7 +17,9 @@
     "check:offline": "node scripts/check-offline.mjs",
     "check:readonly": "node scripts/check-readonly.mjs --self-test && node scripts/check-readonly.mjs",
     "check:imports": "node scripts/check-imports.mjs --self-test",
-    "check:all": "npm run check:config && npm run check:i18n && npm run check:offline && npm run check:readonly && npm run check:imports && npm run check",
+    "check:worker": "npm --prefix worker test && npm --prefix worker run check:fixture",
+    "check:packaging": "node scripts/release/winget.mjs --self-test && node scripts/release/check-release.mjs --warn",
+    "check:all": "npm run check:config && npm run check:i18n && npm run check:offline && npm run check:readonly && npm run check:imports && npm run check:worker && npm run check:packaging && npm run check",
     "sync:config": "node scripts/sync-config.mjs"
   },
   "dependencies": {

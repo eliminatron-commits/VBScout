@@ -1,0 +1,16 @@
+{
+  "name": "vbs-key-service",
+  "private": true,
+  "version": "0.1.0",
+  "license": "SEE LICENSE IN ../LICENSE",
+  "description": "Key service: signs license keys for completed Paddle transactions (Cloudflare Worker)",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "test": "node --test test/worker.test.mjs",
+    "check:fixture": "node test/fixture.mjs --check",
+    "deploy": "wrangler deploy"
+  }
+}

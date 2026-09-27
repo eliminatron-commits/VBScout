@@ -28,6 +28,27 @@ export interface AppInfo {
   uiLanguageSetting: string | null;
   translationsUrl: string;
   rulesAsOf: string;
+  license: LicenseView;
+}
+
+export interface LicenseView {
+  /** `expired`: an MSP license past its last day – the free edition applies until it is renewed. */
+  status: 'none' | 'active' | 'expired';
+  kind: 'organization' | 'msp' | null;
+  licensee: string | null;
+  keyId: string | null;
+  issued: string | null;
+  /** Last day of validity (YYYY-MM-DD), MSP licenses only. */
+  expires: string | null;
+  /** False only in development builds without a public key. */
+  verifiable: boolean;
+}
+
+/** Why a key was refused (verified offline in Rust). */
+export interface LicenseFailure {
+  code: 'malformed' | 'invalidSignature' | 'wrongProduct' | 'unsupportedVersion' | 'expired' | 'unavailable' | 'io';
+  date: string | null;
+  message: string | null;
 }
 
 export interface MachineSummary {
@@ -213,5 +234,8 @@ export const api = {
   clearReportLogo: () => invoke<ReportSettings>('clear_report_logo'),
   exportExcel: (language: string | null) => invoke<string | null>('export_excel', { language }),
   exportPdf: (language: string | null) => invoke<string | null>('export_pdf', { language }),
+  licenseInfo: () => invoke<LicenseView>('license_info'),
+  activateLicense: (key: string) => invoke<LicenseView>('activate_license', { key }),
+  removeLicense: () => invoke<LicenseView>('remove_license'),
   frontendReady: () => invoke<void>('frontend_ready'),
 };

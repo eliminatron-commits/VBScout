@@ -5,7 +5,7 @@ use vbs_evaluation::assessment::Assessment;
 use vbs_evaluation::edition::Edition;
 use vbs_evaluation::import::{ImportedFile, LoadedState};
 use vbs_evaluation::report::{Branding, Logo};
-use vbs_license::License;
+use vbs_license::{License, LicenseVerifier};
 
 use crate::settings::Settings;
 use crate::smoke::SmokeTest;
@@ -21,16 +21,28 @@ pub struct AppState {
     /// The assessment of the loaded results, rebuilt after every change.
     pub assessment: Mutex<Option<Assessment>>,
     pub logo: Mutex<Option<Logo>>,
-    /// Verified license (phase 5 adds the signed keys); `None` = free edition.
+    /// The entered license key, stored next to the settings.
+    pub license_path: PathBuf,
+    /// Offline verifier with the public key of this build (`product.json`).
+    pub verifier: Box<dyn LicenseVerifier>,
+    /// Verified license (possibly expired – the edition checks the date); `None` = free edition.
     pub license: Mutex<Option<License>>,
     pub smoke: SmokeTest,
 }
 
 impl AppState {
     pub fn new(config_dir: PathBuf, smoke: SmokeTest) -> Self {
+        Self::with_verifier(config_dir, smoke, vbs_license::embedded_verifier())
+    }
+
+    /// State with a given license verifier (tests use their own key pair).
+    pub fn with_verifier(config_dir: PathBuf, smoke: SmokeTest, verifier: Box<dyn LicenseVerifier>) -> Self {
         let settings_path = config_dir.join("settings.json");
         let logo_path = config_dir.join("report-logo");
         let logo = std::fs::read(&logo_path).ok().and_then(|bytes| Logo::from_bytes(bytes).ok());
+        let license_path = config_dir.join("license.key");
+        // A stored key is checked again at every start; a key this build cannot verify is ignored.
+        let license = std::fs::read_to_string(&license_path).ok().and_then(|key| verifier.decode(&key).ok());
         Self {
             settings: Mutex::new(Settings::load(&settings_path)),
             settings_path,
@@ -38,7 +50,9 @@ impl AppState {
             results: Mutex::new(Vec::new()),
             assessment: Mutex::new(None),
             logo: Mutex::new(logo),
-            license: Mutex::new(None),
+            license_path,
+            verifier,
+            license: Mutex::new(license),
             smoke,
         }
     }
@@ -50,9 +64,11 @@ impl AppState {
 
     /// The edition the current license grants today (system clock).
     pub fn edition(&self) -> Edition {
-        let today = time::OffsetDateTime::now_utc().date();
-        let license = self.license.lock().ok().and_then(|license| license.clone());
-        Edition::from_license(license.as_ref(), today)
+        Edition::from_license(self.license().as_ref(), today())
+    }
+
+    pub fn license(&self) -> Option<License> {
+        self.license.lock().ok().and_then(|license| license.clone())
     }
 
     /// Rebuilds the assessment from the loaded results.
@@ -73,4 +89,9 @@ impl AppState {
             logo: self.logo.lock().ok().and_then(|logo| logo.clone()),
         }
     }
+}
+
+/// The system date (UTC) – license expiry is checked against the system clock.
+pub fn today() -> time::Date {
+    time::OffsetDateTime::now_utc().date()
 }

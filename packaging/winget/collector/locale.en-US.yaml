@@ -1,0 +1,21 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.10.0.schema.json
+PackageIdentifier: {{id}}
+PackageVersion: {{version}}
+PackageLocale: en-US
+Publisher: {{publisher}}
+PublisherUrl: {{website}}
+PackageName: {{name}} Collector
+PackageUrl: {{website}}
+License: FSL-1.1-ALv2 (source-available)
+ShortDescription: Free, read-only scanner that lists VBScript dependencies of one Windows machine in a result file.
+Description: |-
+  Single portable program without installation. Reads files, registry, scheduled tasks, services, WMI
+  subscriptions, installer packages, event logs and Office macros – strictly read-only – and writes exactly one
+  result file for the {{name}} evaluation. No network connections.
+Tags:
+- vbscript
+- audit
+- inventory
+- sysadmin
+ManifestType: defaultLocale
+ManifestVersion: 1.10.0

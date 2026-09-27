@@ -1,0 +1,21 @@
+{
+  "note": "TEST key pair – see worker/test/fixture.mjs",
+  "publicKey": "6kpsY-KcUgq-9VB7Ey7F-ZVHdq6-vnuSQh7qaRRG0iw",
+  "keys": [
+    {
+      "id": "L-FIXTURE1",
+      "type": "organization",
+      "licensee": "ACME GmbH",
+      "issued": "2026-09-27",
+      "key": "VBS1-eyJ2IjoxLCJwcm9kdWN0IjoidmJzIiwiaWQiOiJMLUZJWFRVUkUxIiwidHlwZSI6Im9yZ2FuaXphdGlvbiIsImxpY2Vuc2VlIjoiQUNNRSBHbWJIIiwiaXNzdWVkIjoiMjAyNi0wOS0yNyJ9.hOuJSJaz7z6sjZ09fF0K4tJ_0PB07GaIUM7FdL_skTbPStR4dnhFuFd5xszx90SXpXd7VgIzNIJ3ApOGDsKRBA"
+    },
+    {
+      "id": "L-FIXTURE2",
+      "type": "msp",
+      "licensee": "Service Nord Sp. z o.o. – Łódź",
+      "issued": "2026-09-27",
+      "expires": "2027-10-11",
+      "key": "VBS1-eyJ2IjoxLCJwcm9kdWN0IjoidmJzIiwiaWQiOiJMLUZJWFRVUkUyIiwidHlwZSI6Im1zcCIsImxpY2Vuc2VlIjoiU2VydmljZSBOb3JkIFNwLiB6IG8uby4g4oCTIMWBw7NkxboiLCJpc3N1ZWQiOiIyMDI2LTA5LTI3IiwiZXhwaXJlcyI6IjIwMjctMTAtMTEifQ.2tGfUF4nGGJiITuBXQUhZNrIyqbCWoAU65kOGH3g_Un3cHGKvysAaiSC_HohVW6QlhycCwoMwmxe5dcYgo30CA"
+    }
+  ]
+}

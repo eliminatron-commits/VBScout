@@ -6,8 +6,8 @@
 | 2/6 Sammler: Systemebene | ✅ abgeschlossen 2026-09-26 | Opus 5.5 (hoch) |
 | 3/6 Sammler: Office-Makros | ✅ abgeschlossen 2026-09-26 | Opus 5.5 (hoch) |
 | 4/6 Auswertung und Berichte | ✅ abgeschlossen 2026-09-27 | Opus 5.5 (mittel) |
-| 5/6 Lizenzen, Übersetzungen, Pakete, Abnahme | ⏭ als Nächstes | Sonnet 5 (mittel) |
-| 6/6 Vermarktung | offen | Opus 5.5 (mittel) |
+| 5/6 Lizenzen, Übersetzungen, Pakete, Abnahme | ✅ abgeschlossen 2026-09-27 | Sonnet 5 (mittel) |
+| 6/6 Vermarktung | ⏭ als Nächstes | Opus 5.5 (mittel) |
 
 **Nachweis Phase 1:** CI-Lauf 36253499363 grün. QK1: statische Nur-lesend-Prüfung mit Selbsttest, Snapshot-Test,
 strace-/ETW-Kernel-Trace mit Positivkontrolle – 0 Änderungen. QK2: Offline-Prüfung inkl. Abhängigkeitsgraph,
@@ -67,7 +67,37 @@ windows-2025 als Organisation ausgewertet: 195 eigene Einträge (hoch 6, mittel 
 16 Windows-Bestandteile (86 Fundorte); Einstufung durchgesehen – hoch sind nur Fixtures der Testsammlung unter
 Autostart-/Anmeldeskript-Pfaden, deaktivierte Aufgaben (Server Manager `CleanupOldPerfLogs`) ruhend, keine Fehleinstufung.
 
+**Nachweis Phase 5:** Lizenzformat `VBS1-<payload>.<signature>` (Ed25519, offline, Produktcode `vbs`, Neuentwurf –
+Stepwright hatte keins; `docs/licensing.md`); App: Seite „Lizenz“ (aktivieren, entfernen, Ablauf, Schlüssel-ID), Schlüssel
+bei jedem Start neu geprüft, Edition/Maschinengrenze sofort angewendet; Texte in 8 Sprachen (525 Schlüssel).
+Schlüsseldienst `worker/` (Cloudflare Worker, Paddle-Sandbox): Webhook-Signatur, ein Schlüssel je Transaktion,
+MSP bis Periodenende + 14 Tage, Lizenznehmer aus Checkout/Paddle-Firma oder einmalig nachgetragen, Selbstprüfung
+gegen den öffentlichen Schlüssel der App; `tools/license-keys` (Schlüsselpaar, manuelle Schlüssel, Prüfung).
+Pakete: `scripts/release/package.ps1` (Sammler portabel, NSIS-Installer pro Benutzer ohne Download, portable App,
+SHA256SUMS, winget-Manifeste, Drittanbieter-Hinweise mit ~300 Komponenten + OFL), Codesignierung vorbereitet
+(`sign.ps1`, Secrets), `release.yml` (Tag → Entwurf eines GitHub-Release), README (en), LICENSE (offizieller
+FSL-1.1-ALv2-Text), PRIVACY.md.
+
+**Abnahme – Qualitätskriterien (Definition of Done)**
+
+| # | Kriterium | Nachweis |
+|---|---|---|
+| 1 | Sammler verändert nichts, schreibt nur die Ergebnisdatei | statische Prüfung mit Selbsttest, Snapshot-Test, strace-/ETW-Kerneltrace mit Positivkontrolle (CI Linux/Windows) – 0 Änderungen |
+| 2 | null Netzwerkverbindungen (Sammler, Auswertung) | Offline-Prüfung (CSP, Rechte, Abhängigkeitsgraph, Quellen, Installer ohne WebView2-Download) + Blockadetest mit Positivkontrolle für Sammler und App inkl. WebView2 (CI) – 0 Verbindungen; Lizenz wird offline geprüft |
+| 3 | < 10 MB, ohne Installation, Win 10/11, Server 2016–2025; ohne Admin eingeschränkt mit Hinweis | Größen- und Importprüfung (nur Windows-Systembibliotheken, statische CRT), Läufe auf Server 2022/2025 inkl. Nicht-Admin-Lauf (CI); Win 10/11 und Server 2016/2019 → offener Punkt |
+| 4 | Positiv 100 %, Negativ 0 Fehlalarme, geschützte Makros „not checkable“ | Korpus-Tests (103 erwartete Befunde, Negativsammlung 0) in CI |
+| 5 | 100.000 Dateien < 10 min; 1.000 Ergebnisdateien < 1 min | Leistungstests in CI (Linux/Windows): Dateien in < 1 s, Zusammenführen 3,1 s |
+| 6 | PDF + Excel in 8 Sprachen; Gratis-Grenzen, Organisations- und MSP-Lizenz (Logo, Ablauf); manipulierte Schlüssel abgelehnt | Berichte in 8 Sprachen (Rust-Tests, pdftotext/zipfile, Smoke-Test); Editions-/Ansichts-Tests; App-Tests Aktivieren/Neustart/Ablauf/Entfernen; jede Einzeländerung eines Schlüssels, fremde Signatur, vertauschte Signatur abgelehnt (`vbs-license`, App, Worker) |
+| 7 | Pipeline erzeugt alle Pakete; winget-Manifeste | CI windows-2025: `package.ps1` + stille Installation/Start/Deinstallation; `release.yml`; `packaging/winget/` + Generator-Selbsttest |
+
 **Offene Punkte / Abweichungen**
+- Vor dem ersten Release (die Release-Pipeline bricht sonst ab, `check-release.mjs`): Signierschlüssel erzeugen
+  (`license-keys keygen`) und öffentlichen Schlüssel in `product.json`/`wrangler.toml` eintragen; Platzhalter
+  (Herausgeber, Website, Support-Mail, Lizenzgeber in LICENSE) ersetzen; Codesignier-Zertifikat als Secrets hinterlegen.
+- Paddle-Sandbox: Produkte/Preise und Benachrichtigungsziel anlegen, Worker deployen (Schritte in `docs/licensing.md`) –
+  braucht das Paddle-/Cloudflare-Konto des Nutzers; Livegang erst nach Freigabe. Testkauf in der Sandbox steht aus.
+- Die Auswertung braucht die WebView2-Laufzeit (in Windows 10/11 enthalten, auf Server 2016–2022 nachzuinstallieren;
+  winget installiert sie als Abhängigkeit) – der Installer lädt bewusst nichts nach.
 - QK4-Präzisierung: Ein nur „für die Anzeige gesperrtes“ VBA-Projekt wird gelesen (die Sperre verschlüsselt den
   Quelltext nicht) und mit `projectLocked` gemeldet – „not checkable“ nur, wenn der Code wirklich nicht lesbar ist.
 - WSH-Objekte werden wie vorgegeben als `review` gemeldet; die Scripting Runtime (FileSystemObject, Dictionary) nicht –
@@ -76,15 +106,13 @@ Autostart-/Anmeldeskript-Pfaden, deaktivierte Aufgaben (Server Manager `CleanupO
   Nicht im Umfang: PowerPoint-/Visio-Binärformate, XLM-Makros, Access-Makroobjekte, kompilierte .mde/.accde.
 - Access 97 mit Code nur lokal an Northwind geprüft (Lizenz unklar, nicht im Repo); ACE-Datenbanken mit Kennwort nur
   über das Kopffeld erkannt (kein echtes Beispiel). Dateien mit Excels Standardkennwort gelten als kennwortgeschützt.
-- Stepwright hat selbst erst Phase 1: kein Ed25519-Format, kein Worker → vor Phase 5 entscheiden.
 - Microsoft-Quellen nur per Suchauszug geprüft (learn/techcommunity/devblogs gesperrt) → vor Release direkt gegenlesen.
 - Platzhalter in `product.json` (Domain, Support-Mail, Identifier), Markenprüfung „VBScout“, Lizenzgeber für LICENSE offen.
 - QK3: Windows 10/11 und Server 2016/2019 nicht in CI (Rust-Ziel belegt „Windows 10+/Server 2016+“) → Lauf auf echten
   Maschinen bei der Abnahme (Phase 5).
 - Ereignis 4096 wurde auf keinem Runner protokolliert → Datenformat auf einem System verifizieren, das es schreibt.
-- Phase 4: Die App läuft bis zu den Lizenzschlüsseln (Phase 5) immer als Gratis-Edition; Organisation/MSP nur in Tests
-  und `examples/report.rs --edition`. Aufwandswerte sind eigene Faustwerte ohne externe Quelle (so gekennzeichnet) →
-  mit Praxiswerten nachjustieren. Drittanbieter-Hinweise (Liberation Sans/OFL, Crates) für das Release zusammenstellen.
+- Phase 4: Aufwandswerte sind eigene Faustwerte ohne externe Quelle (so gekennzeichnet) →
+  mit Praxiswerten nachjustieren.
   PDF/Excel des Runner-Vollscans (Ordner `reports-out/` im CI-Artefakt `traces-windows-2025`) einmal ansehen – die
   Einstufung ist geprüft, Layout mit echten Daten noch nicht. fr/es/it/nl/pl/pt-BR maschinell
   unterstützt (Korrekturhinweis in der App). „Manage the Component Store“ (Microsoft Learn) vor Release gegenlesen.

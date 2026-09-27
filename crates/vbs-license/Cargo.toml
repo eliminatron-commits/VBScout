@@ -1,15 +1,24 @@
 [package]
 name = "vbs-license"
-description = "License interface (offline verification only; Ed25519 key format in phase 5)"
+description = "License keys: signed Ed25519 format, verified offline only"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+# Signing keys – only for the vendor's offline tool (tools/license-keys), never for the app.
+issue = []
+
 [dependencies]
+base64.workspace = true
+ed25519-dalek.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
 time.workspace = true
+vbs-config.workspace = true
 
 [lints]
 workspace = true

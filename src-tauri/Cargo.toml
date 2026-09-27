@@ -26,7 +26,9 @@ vbs-i18n.workspace = true
 vbs-license.workspace = true
 
 [dev-dependencies]
+ed25519-dalek.workspace = true
 tempfile.workspace = true
+vbs-license = { workspace = true, features = ["issue"] }
 
 [lints]
 workspace = true

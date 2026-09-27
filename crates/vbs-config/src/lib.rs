@@ -34,11 +34,16 @@ pub struct Product {
     /// collector nor the app ever contacts it.
     pub website: String,
     pub support_email: String,
+    /// Publisher of the release files (installer, winget); placeholder until the vendor is set.
+    pub publisher: String,
+    /// Download URL of a release file with `{version}` and `{file}` (winget manifests).
+    pub release_url: String,
     /// Where translators find the catalogs (shown next to unreviewed languages).
     pub translations_url: String,
     pub result_file: ResultFileConfig,
     pub editions: Editions,
     pub pricing: Pricing,
+    pub license: LicenseConfig,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -88,6 +93,16 @@ pub struct Price {
     pub billing: String,
 }
 
+/// License keys (`vbs-license`).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LicenseConfig {
+    /// Ed25519 public key of the key service, base64url (43 characters). `null` until the vendor
+    /// has created the signing key (`tools/license-keys keygen`); such a build accepts no keys, and
+    /// the release pipeline refuses to build it.
+    pub public_key: Option<String>,
+}
+
 impl Product {
     /// Parses and validates a product configuration.
     pub fn parse(json: &str) -> Result<Self, String> {
@@ -115,6 +130,15 @@ impl Product {
                 return Err(format!("{label} must be an https:// URL"));
             }
         }
+        if self.publisher.trim().is_empty() || self.publisher.trim() != self.publisher {
+            return Err("publisher must not be empty".into());
+        }
+        if !self.release_url.starts_with("https://")
+            || !self.release_url.contains("{version}")
+            || !self.release_url.contains("{file}")
+        {
+            return Err("releaseUrl must be an https:// URL with {version} and {file}".into());
+        }
         if !self.support_email.contains('@') {
             return Err("supportEmail must be an e-mail address".into());
         }
@@ -141,6 +165,12 @@ impl Product {
         for (label, price, per, billing) in expected {
             if price.amount_minor == 0 || price.per != per || price.billing != billing {
                 return Err(format!("pricing.{label} must be a positive {billing} price per {per}"));
+            }
+        }
+        if let Some(key) = &self.license.public_key {
+            let base64url = |c: char| c.is_ascii_alphanumeric() || c == '-' || c == '_';
+            if key.len() != 43 || !key.chars().all(base64url) {
+                return Err("license.publicKey must be a base64url Ed25519 public key (43 characters) or null".into());
             }
         }
         Ok(())
@@ -180,7 +210,10 @@ mod tests {
 
     #[test]
     fn rejects_invalid_values() {
-        let cases: [(&str, serde_json::Value); 8] = [
+        let cases: [(&str, serde_json::Value); 11] = [
+            ("/publisher", " ".into()),
+            ("/releaseUrl", "https://example.com/latest.exe".into()),
+            ("/license/publicKey", "not a key".into()),
             ("/name", "".into()),
             ("/identifier", "VBScout".into()),
             ("/website", "http://insecure.example".into()),

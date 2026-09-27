@@ -4,17 +4,54 @@
 deprecated VBScript; it is expected to be disabled by default in a later phase (around 2027 according to Microsoft's
 [published timeline](https://techcommunity.microsoft.com/blog/windows-itpro-blog/vbscript-deprecation-timelines-and-next-steps/4148301),
 as of 2026-09-26) and to be removed afterwards. VBScout shows what would break – scripts, scheduled tasks, logon
-scripts, services, installer actions and Office macros – and helps plan the migration.
+scripts, services, WMI subscriptions, installer actions and Office macros – and helps plan the migration.
 
-> **Status:** in development. The collector finds all finding types (system level and Office macros); the
-> evaluation merges result files and creates the management PDF and the technical Excel list. Licensing, packages
-> and the website follow.
+## Downloads
+
+Every release (GitHub → Releases) contains, for Windows x64:
+
+| File | What it is |
+|---|---|
+| `VBScout-Collector-<version>-x64.exe` | the **collector** – one portable file, no installation, free |
+| `VBScout-<version>-x64-setup.exe` | the **evaluation app**, installer (per user, no administrator rights needed) |
+| `VBScout-<version>-x64-portable.exe` | the evaluation app without installation |
+| `VBScout-<version>-SHA256SUMS.txt` | checksums – verify with `Get-FileHash <file>` |
+| `VBScout-<version>-THIRD-PARTY-NOTICES.md` | licenses of the components inside the programs |
+| `VBScout-<version>-winget-manifests.zip` | manifests for the Windows Package Manager |
+
+Requirements: the collector runs on Windows 10/11 and Windows Server 2016–2025 (x64). The evaluation app needs
+Windows 10 (1809) or later with the Microsoft Edge WebView2 runtime, which Windows 10/11 already include – the
+installer never downloads anything.
 
 ## How it works
 
-1. **Collector** – one portable program file, no installation. Run it on every computer (manually, or through GPO,
-   Intune or an RMM tool). It only reads and writes a single result file (`.vbscout`).
-2. **Evaluation** – a desktop app that merges any number of result files, ranks the risks and creates the reports.
+1. **Collector** – run it on every computer you want to check: by hand, or through GPO, Intune or your RMM tool
+   (as administrator or SYSTEM for a complete scan). It only reads and writes a single result file (`.vbscout`):
+
+   ```bat
+   VBScout-Collector-<version>-x64.exe --out \\fileserver\vbscout-results\ --quiet
+   ```
+
+   Useful options: `--path <folder>` (scan only these folders), `--include-unc <\\server\share>` (also scan a network
+   share – never done otherwise), `--files-only`, `--lang de`. `--help` lists all. Without administrator rights the
+   scan is limited and the result says so. Exit code 0 = result written.
+2. **Evaluation** – open any number of result files (or a whole folder) in the app. It keeps the newest scan per
+   machine, merges identical findings across machines, rates the risk (started automatically > used according to the
+   event logs > Office macro > dormant file) and shows Windows' own components separately.
+3. **Reports** – a technical **Excel list** and, with a license, a **management PDF** with priorities, migration
+   hints and effort estimates (clearly labelled as rules of thumb), in eight languages.
+
+## Editions
+
+| | Free | Organization license (one-time) | MSP license (yearly) |
+|---|---|---|---|
+| Collector | ✓ | ✓ | ✓ |
+| Finding list, Excel list | a limited number of machines | unlimited machines of one organization | unlimited customer environments |
+| Management PDF, migration hints, effort estimates | – | ✓ | ✓ |
+| Name in the reports | – | organization | your company name and logo |
+
+Prices are on the website. License keys are entered under **License** in the app and verified on the computer –
+see [`docs/licensing.md`](docs/licensing.md).
 
 ## Safety first
 
@@ -26,6 +63,11 @@ scripts, services, installer actions and Office macros – and helps plan the mi
 - **No silent gaps.** Everything that cannot be checked (password-protected macros, locked or online-only files, …)
   is reported as "not checkable", and the result records what the scan could and could not see.
 - **Secrets stay secret.** Evidence contains only the affected lines, with passwords and connection strings masked.
+- **Signed releases** (as soon as the code-signing certificate is in place) and published checksums. Scanning many
+  files and registry keys can look unusual to security products; the collector's behaviour is documented here and in
+  [`docs/result-format.md`](docs/result-format.md).
+
+Privacy: [`PRIVACY.md`](PRIVACY.md).
 
 ## Building from source
 
@@ -34,16 +76,20 @@ Requirements: Rust (the version pinned in `rust-toolchain.toml`), Node.js 22.12+
 
 ```sh
 npm ci
-npm run check:all                          # configuration, translations, offline and read-only policy, types
+npm run check:all                          # configuration, translations, offline/read-only policy, key service, types
 cargo test --workspace
 cargo build --release -p vbs-collector     # the collector: target/release/vbs-collector(.exe)
 npx tauri build --no-bundle                # the evaluation app: target/release/vbs-app(.exe)
 ```
 
+Release files for Windows: `scripts/release/package.ps1` (the same script runs in CI and in the release workflow,
+`.github/workflows/release.yml`, started by a `v<version>` tag).
+
 ## License
 
-VBScout is **source-available** under the Functional Source License 1.1 with Apache 2.0 future license
-(FSL-1.1-ALv2). It is not open-source software; the license text will be added to `LICENSE`. The collector is free
-for everyone; the full evaluation requires an organization or MSP license.
+VBScout is **source-available** under the [Functional Source License 1.1, ALv2 Future License](LICENSE)
+(FSL-1.1-ALv2): you may use, change and share it for any purpose except a competing product; each version becomes
+available under the Apache License 2.0 two years after its release. It is not open-source software. The collector is
+free for everyone; the full evaluation requires an organization or MSP license.
 
 Translations are welcome – see [`i18n/README.md`](i18n/README.md).

@@ -1,0 +1,30 @@
+# Key service of VBScout (Cloudflare Worker). Deploy: `npx wrangler deploy` (see docs/licensing.md).
+# Secrets are never stored here – set them with `npx wrangler secret put <NAME>`:
+#   LICENSE_SIGNING_KEY    Ed25519 seed from `cargo run -p license-keys -- keygen` (base64url)
+#   PADDLE_WEBHOOK_SECRET  secret key of the Paddle notification destination
+#   PADDLE_API_KEY         optional: Paddle API key (business name, buyer e-mail for delivery)
+#   RESEND_API_KEY         optional: e-mail delivery of the key
+name = "vbscout-keys"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[vars]
+# "sandbox" until the user approves going live; then "production" (and production prices/secrets).
+PADDLE_ENVIRONMENT = "sandbox"
+# Price IDs of the Paddle products (sandbox first): organization license (one-time) and MSP license (yearly).
+PADDLE_PRICE_ORGANIZATION = ""
+PADDLE_PRICE_MSP = ""
+# Public key built into the app (product.json license.publicKey); the Worker refuses to sign with a
+# key that does not belong to it.
+LICENSE_PUBLIC_KEY = ""
+# Days an MSP key stays valid after the paid period (renewal issues a new key).
+MSP_GRACE_DAYS = "14"
+# Origin of the checkout success page that reads /license/<txn> (phase 6 website).
+ALLOWED_ORIGIN = ""
+PRODUCT_NAME = "VBScout"
+EMAIL_FROM = ""
+
+[[kv_namespaces]]
+binding = "LICENSES"
+# `npx wrangler kv namespace create LICENSES` prints the id.
+id = "00000000000000000000000000000000"

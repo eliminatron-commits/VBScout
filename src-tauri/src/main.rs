@@ -32,6 +32,9 @@ fn main() {
             commands::clear_report_logo,
             commands::export_excel,
             commands::export_pdf,
+            commands::license_info,
+            commands::activate_license,
+            commands::remove_license,
             commands::frontend_ready,
         ])
         .setup(move |app| {

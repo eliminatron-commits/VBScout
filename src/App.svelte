@@ -6,6 +6,7 @@
     type AppInfo,
     type EditionKind,
     type ImportSummary,
+    type LicenseView,
     type MachineSummary,
     type Overview as OverviewData,
     type RiskLevel,
@@ -21,9 +22,11 @@
     tc,
     type MessageKey,
   } from './lib/i18n.svelte';
+  import { formatDay } from './lib/format';
   import { product } from './lib/product';
   import Logo from './lib/Logo.svelte';
   import Findings from './components/Findings.svelte';
+  import License from './components/License.svelte';
   import FindingsOverview from './components/Overview.svelte';
   import Machines from './components/Machines.svelte';
   import Reports from './components/Reports.svelte';
@@ -40,6 +43,8 @@
   let busy = $state(false);
   let dropActive = $state(false);
   let tab = $state<Tab>('overview');
+  /** The license page replaces the main content (reachable before any import). */
+  let licenseOpen = $state(false);
   let revision = $state(0);
   let findingsRisk = $state<RiskLevel | null>(null);
   let findingsOrigin = $state<'own' | 'windows' | 'all'>('own');
@@ -104,6 +109,18 @@
     overview = null;
     tab = 'overview';
     revision += 1;
+  }
+
+  /** A license was activated or removed: the edition, the machine limit and the views change. */
+  async function licenseChanged(view: LicenseView) {
+    try {
+      info = await api.appInfo();
+      if (info) info.license = view;
+      machines = await api.loadedMachines();
+      await refresh();
+    } catch (e) {
+      error = String(e);
+    }
   }
 
   function showFindings(risk: RiskLevel | null, origin: 'own' | 'windows') {
@@ -176,6 +193,9 @@
         {#if info.edition.licensee}
           <span class="licensee">{t('edition.licensedTo', { name: info.edition.licensee })}</span>
         {/if}
+        <button type="button" class="quiet license-link" aria-pressed={licenseOpen} onclick={() => (licenseOpen = !licenseOpen)}>
+          {t('nav.license')}
+        </button>
       {/if}
     </div>
     <label class="language">
@@ -189,11 +209,24 @@
     </label>
   </header>
 
+  {#if info?.license.status === 'expired' && info.license.expires && !licenseOpen}
+    <p class="notice" role="alert">
+      {t('license.expiredNotice', { date: formatDay(info.license.expires) })}
+      <button type="button" class="quiet license-link" onclick={() => (licenseOpen = true)}>{t('license.enter')}</button>
+    </p>
+  {/if}
+
   {#if info && !reviewed && isLang(language())}
     <p class="notice" role="note">{t('language.unreviewed', { url: info.translationsUrl })}</p>
   {/if}
 
   <main class="content">
+    {#if licenseOpen && info}
+      <div class="actions">
+        <button type="button" class="quiet" onclick={() => (licenseOpen = false)}>← {t('license.back')}</button>
+      </div>
+      <License license={info.license} onchange={licenseChanged} />
+    {:else}
     {#if machines.length === 0}
       <section class="hero" aria-labelledby="hero-title">
         <h1 id="hero-title">{product.name}</h1>
@@ -292,7 +325,11 @@
           <strong>{t('edition.free')}</strong> · {t('edition.freeLimit', { max: info.edition.maxMachines })}
         </p>
         <p class="hint">{t('edition.freeExcludes')}</p>
+        <div class="actions">
+          <button type="button" onclick={() => (licenseOpen = true)}>{t('license.enter')}</button>
+        </div>
       </section>
+    {/if}
     {/if}
   </main>
 
@@ -352,6 +389,15 @@
   .licensee {
     color: var(--muted);
     font-size: 0.85rem;
+  }
+
+  .license-link {
+    padding: 0.3rem 0.7rem;
+    font-size: 0.85rem;
+  }
+
+  .license-link[aria-pressed='true'] {
+    border-color: var(--accent);
   }
 
   .language {

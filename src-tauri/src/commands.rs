@@ -9,8 +9,9 @@ use tauri::{AppHandle, State, WebviewWindow};
 use vbs_evaluation::edition::Edition;
 use vbs_evaluation::report::{Logo, LogoError, LogoFormat, ReportContext, pdf, xlsx};
 use vbs_i18n::{Lang, key, t_args};
+use vbs_license::{LicenseError, format_date};
 
-use crate::state::AppState;
+use crate::state::{AppState, today};
 use crate::summary::{ImportSummary, MachineSummary};
 use crate::views::{FindingDetail, FindingQuery, FindingsPage, Overview};
 
@@ -58,6 +59,7 @@ pub struct AppInfo {
     ui_language_setting: Option<String>,
     translations_url: String,
     rules_as_of: String,
+    license: LicenseView,
 }
 
 #[derive(Debug, Serialize)]
@@ -96,6 +98,7 @@ pub fn app_info(state: State<'_, AppState>) -> Result<AppInfo, String> {
         ui_language_setting: settings.ui_language.clone(),
         translations_url: product.translations_url.clone(),
         rules_as_of: vbs_core::rules::catalog().as_of_text(),
+        license: license_view(&state),
     })
 }
 
@@ -291,6 +294,106 @@ pub fn clear_report_logo(state: State<'_, AppState>) -> Result<ReportSettings, S
     Ok(report_settings_of(&state))
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LicenseView {
+    /// `none`, `active` or `expired` (an MSP license past its last day: free edition until renewed).
+    status: &'static str,
+    /// `organization` or `msp`.
+    kind: Option<&'static str>,
+    licensee: Option<String>,
+    /// Short key identifier for support requests.
+    key_id: Option<String>,
+    issued: Option<String>,
+    /// Last day of validity (MSP licenses).
+    expires: Option<String>,
+    /// Whether this build can verify keys at all (release builds always can).
+    verifiable: bool,
+}
+
+fn license_view(state: &AppState) -> LicenseView {
+    let license = state.license();
+    let status = match &license {
+        None => "none",
+        Some(license) if license.is_expired(today()) => "expired",
+        Some(_) => "active",
+    };
+    LicenseView {
+        status,
+        kind: license.as_ref().map(|license| license.kind_code()),
+        licensee: license.as_ref().map(|license| license.licensee().to_owned()),
+        key_id: license.as_ref().map(|license| license.key_id.clone()),
+        issued: license.as_ref().map(|license| format_date(license.issued)),
+        expires: license.as_ref().and_then(|license| license.expires()).map(format_date),
+        verifiable: vbs_config::product().license.public_key.is_some(),
+    }
+}
+
+/// Why a key was refused: `code` names the `license.error.<code>` text, `date` the expiry.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LicenseFailure {
+    code: &'static str,
+    date: Option<String>,
+    message: Option<String>,
+}
+
+impl From<LicenseError> for LicenseFailure {
+    fn from(error: LicenseError) -> Self {
+        let date = match &error {
+            LicenseError::Expired(date) => Some(format_date(*date)),
+            _ => None,
+        };
+        Self { code: error.code(), date, message: None }
+    }
+}
+
+#[tauri::command]
+pub fn license_info(state: State<'_, AppState>) -> LicenseView {
+    license_view(&state)
+}
+
+/// Verifies a pasted key offline and, if genuine and valid today, stores it and applies the edition.
+#[tauri::command]
+pub fn activate_license(state: State<'_, AppState>, key: String) -> Result<LicenseView, LicenseFailure> {
+    activate(&state, &key)
+}
+
+fn activate(state: &AppState, key: &str) -> Result<LicenseView, LicenseFailure> {
+    let license = state.verifier.verify(key, today())?;
+    let normalized: String = key.chars().filter(|c| !c.is_whitespace()).collect();
+    write_file(&state.license_path, format!("{normalized}\n").as_bytes()).map_err(|e| LicenseFailure {
+        code: "io",
+        date: None,
+        message: Some(e.to_string()),
+    })?;
+    if let Ok(mut slot) = state.license.lock() {
+        *slot = Some(license);
+    }
+    // The machine limit and the unlocked parts change with the edition.
+    state.rebuild();
+    Ok(license_view(state))
+}
+
+/// Removes the stored key; the evaluation continues as the free edition.
+#[tauri::command]
+pub fn remove_license(state: State<'_, AppState>) -> Result<LicenseView, String> {
+    remove(&state)
+}
+
+fn remove(state: &AppState) -> Result<LicenseView, String> {
+    match std::fs::remove_file(&state.license_path) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.to_string()),
+    }
+    if let Ok(mut slot) = state.license.lock() {
+        *slot = None;
+    }
+    state.rebuild();
+    Ok(license_view(state))
+}
+
 /// Writes a file completely or not at all (temporary file, then rename).
 fn write_file(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     if let Some(dir) = path.parent() {
@@ -418,6 +521,101 @@ mod tests {
             (b"foobar", "Zm9vYmFy"),
         ] {
             assert_eq!(base64(input), expected);
+        }
+    }
+
+    mod licensing {
+        use super::super::*;
+        use crate::smoke::SmokeTest;
+        use ed25519_dalek::SigningKey;
+        use time::Duration;
+        use vbs_license::{Ed25519Verifier, License, LicenseKind, issue};
+
+        fn signing_key() -> SigningKey {
+            SigningKey::from_bytes(&[42; 32])
+        }
+
+        fn state(dir: &Path) -> AppState {
+            let verifier = Ed25519Verifier::new(signing_key().verifying_key());
+            AppState::with_verifier(dir.to_path_buf(), SmokeTest::from_args(std::iter::empty()), Box::new(verifier))
+        }
+
+        fn key(kind: LicenseKind) -> String {
+            let license = License { key_id: "L-APPTEST1".into(), kind, issued: today() - Duration::days(400) };
+            issue(&signing_key(), &license).unwrap()
+        }
+
+        fn msp(expires: time::Date) -> String {
+            key(LicenseKind::Msp { company: "IT Service Nord".into(), expires })
+        }
+
+        #[test]
+        fn organization_license_is_stored_and_survives_a_restart() {
+            let dir = tempfile::tempdir().unwrap();
+            let app = state(dir.path());
+            assert_eq!(license_view(&app).status, "none");
+            assert!(app.edition().is_free());
+
+            let view = activate(&app, &key(LicenseKind::Organization { name: "ACME GmbH".into() })).unwrap();
+            assert_eq!(
+                (view.status, view.kind, view.licensee.as_deref()),
+                ("active", Some("organization"), Some("ACME GmbH"))
+            );
+            assert_eq!(app.edition().machine_limit(), None);
+            assert!(app.edition().allows_pdf() && !app.edition().allows_logo());
+
+            let restarted = state(dir.path());
+            assert_eq!(restarted.edition().licensee(), Some("ACME GmbH"));
+
+            remove(&restarted).unwrap();
+            assert!(restarted.edition().is_free());
+            assert!(state(dir.path()).edition().is_free(), "removed for good");
+        }
+
+        #[test]
+        fn msp_license_unlocks_the_logo_until_it_expires() {
+            let dir = tempfile::tempdir().unwrap();
+            let app = state(dir.path());
+            let view = activate(&app, &msp(today() + Duration::days(30))).unwrap();
+            assert_eq!(view.kind, Some("msp"));
+            assert!(app.edition().allows_logo());
+
+            // An expired key is refused with its date …
+            let expired = today() - Duration::days(1);
+            let failure = activate(&app, &msp(expired)).unwrap_err();
+            assert_eq!((failure.code, failure.date), ("expired", Some(format_date(expired))));
+            // … and a stored key that expired meanwhile shows as expired with the free edition.
+            std::fs::write(dir.path().join("license.key"), msp(expired)).unwrap();
+            let later = state(dir.path());
+            assert_eq!(license_view(&later).status, "expired");
+            assert!(later.edition().is_free() && !later.edition().allows_logo());
+        }
+
+        #[test]
+        fn tampered_and_foreign_keys_are_refused_and_change_nothing() {
+            let dir = tempfile::tempdir().unwrap();
+            let app = state(dir.path());
+            let genuine = key(LicenseKind::Organization { name: "ACME GmbH".into() });
+            let (payload, signature) = genuine["VBS1-".len()..].split_once('.').unwrap();
+            let mut forged_payload = payload.to_owned();
+            forged_payload.replace_range(20..21, if &payload[20..21] == "A" { "B" } else { "A" });
+            let forged = format!("VBS1-{forged_payload}.{signature}");
+            let foreign = issue(
+                &SigningKey::from_bytes(&[7; 32]),
+                &License {
+                    key_id: "L-X".into(),
+                    kind: LicenseKind::Organization { name: "X".into() },
+                    issued: today(),
+                },
+            )
+            .unwrap();
+            for (bad, code) in
+                [(forged.as_str(), "invalidSignature"), (&foreign, "invalidSignature"), ("hello", "malformed")]
+            {
+                assert_eq!(activate(&app, bad).unwrap_err().code, code, "{bad}");
+            }
+            assert!(app.edition().is_free());
+            assert!(!dir.path().join("license.key").exists());
         }
     }
 

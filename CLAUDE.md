@@ -40,6 +40,9 @@ Two programs:
 | Program imports | `node scripts/check-imports.mjs <exe> [--out <list>]` – only reviewed Windows system DLLs, no C runtime, no network DLLs (`--self-test` in `check:all`) |
 | Propagate product.json | `npm run sync:config` |
 | Cross-check Windows code on Linux | `cargo clippy --target x86_64-pc-windows-msvc -p vbs-collector --all-targets -- -D warnings` |
+| License keys (vendor, offline) | `cargo run -p license-keys -- keygen --out <file>` · `issue --key <file> --type organization\|msp --licensee <name> [--expires YYYY-MM-DD]` · `inspect <key>` |
+| Key service (Worker) | `cd worker && npm test` (Node test runner, no deps) · `npm run check:worker` (tests + fixture that Rust verifies) · deploy: `npx wrangler deploy` (docs/licensing.md) |
+| Release files (Windows) | `pwsh scripts/release/package.ps1 [-SkipBuild] [-OutDir dist-release]` – collector, NSIS setup, portable app, SHA256SUMS, winget manifests, third-party notices; `scripts/release/installer-test.ps1 -Setup <exe>`; `node scripts/release/check-release.mjs [--warn]` (public key set, no placeholders) |
 
 The toolchain is pinned in `rust-toolchain.toml` (same as Stepwright). Building the app crate on Linux needs
 WebKitGTK 4.1 (`libwebkit2gtk-4.1-dev`); the product itself targets Windows x64 only.
@@ -50,8 +53,11 @@ from the corpus scan and sample machines, read back with pdftotext and the Pytho
 on windows-2025 and windows-2022 (clippy, tests, release build with static CRT, size and import check, scan and merge
 performance tests, ETW read-only trace, network block test, non-admin run, system test with artefacts made by Windows,
 full scan of the runner without internal errors and without findings for Windows servicing data or ESE databases,
-reports of that full scan; app build, smoke test – which renders both reports in every language – and network tests
-on 2025). Logs, results and reports are uploaded as artifacts.
+reports of that full scan; app build with NSIS installer, smoke test – which renders both reports in every language –,
+network tests, release files and a silent install/start/uninstall test on 2025). Logs, results, reports and the
+release files are uploaded as artifacts. Release (`.github/workflows/release.yml`, tag `v<version>` or manual): release
+check (refuses placeholders and a missing public key), `check:all`, `package.ps1` with optional code signing
+(secrets `VBS_SIGN_CERT_BASE64`/`VBS_SIGN_CERT_PASSWORD`), smoke test of the packaged app, draft GitHub release.
 
 ## Layout
 
@@ -74,18 +80,26 @@ crates/
                         de-duplication, Windows components, entry→script links, risk), effort (rules of thumb),
                         coverage, edition (limits enforced here), report/ (pdf with a small layout engine,
                         xlsx, text formatting), sample (synthetic results); assets/fonts (Liberation Sans, OFL)
-  vbs-license/          license interface (offline only; Ed25519 format + org/MSP keys in phase 5)
+  vbs-license/          license keys: `VBS1-<payload>.<signature>` (Ed25519, public key from product.json), verified
+                        offline only; feature `issue` (signing) for the vendor tool and tests only
 src-tauri/              Tauri shell (crate vbs-app): commands, smoke test, settings, tauri.conf.json, capabilities, icons
 src/                    Svelte 5 + TypeScript frontend (view only; talks to Rust via IPC): App.svelte (shell, import,
-                        tabs), components/ (overview, findings with detail, machines, reports)
+                        tabs, license page), components/ (overview, findings with detail, machines, reports, license)
 tests/corpus/           positive/ and negative/ collections incl. system/ and office/ fixtures + expected.json (DoD #4),
                         make-binaries.py, office_fixtures.py + tools/OfficeFixtures.java, THIRD-PARTY.md (real Office files)
 scripts/                sync-config, check-i18n/offline/readonly/size (Node, no deps); nettest/, readonly/, systemtest/ (dynamic);
                         reports/check.py (reads the reports with pdftotext and the Python standard library)
-docs/                   result-format.md, result.schema.json, examples/, research-notes.md (sources with dates)
+                        release/ (names, package.ps1, sign.ps1, installer-test.ps1, winget.mjs, third-party.mjs, check-release)
+docs/                   result-format.md, result.schema.json, examples/, research-notes.md (sources with dates),
+                        licensing.md (key format, key service, Paddle setup, operations)
+tools/license-keys/     vendor CLI: create the signing key, issue/inspect keys (never shipped)
+worker/                 key service (Cloudflare Worker, plain JS): Paddle webhook → signed key in KV, /license/<txn>;
+                        test/ with Node's test runner and the fixture the Rust verifier checks
+packaging/winget/       winget manifest templates (app: NSIS per user, collector: portable)
+LICENSE, PRIVACY.md     FSL-1.1-ALv2 (licensor to be filled in), privacy notice of the programs and the purchase
 ```
 
-Later phases add: `worker/` + `tools/` license keys (5), `packaging/` winget + installer (5), `website/` (6).
+Phase 6 adds `website/`.
 
 ## Naming
 
@@ -177,7 +191,9 @@ Later phases add: `worker/` + `tools/` license keys (5), `packaging/` winget + i
 9. **Editions**: collector always free. Evaluation free = finding list, ≤ `editions.free.maxMachines` machines, no
    PDF, no migration hints, no effort; organization license (one-time, org name in reports, unlimited machines);
    MSP license (yearly, expiry against the system clock, unlimited customer environments, own logo and company name).
-   Keys are verified offline only (Ed25519, phase 5). Enforced in Rust (`vbs_evaluation::edition`): at import (files
+   Keys are verified offline only (Ed25519, `docs/licensing.md`; the key service issues them for Paddle
+   transactions, MSP keys valid through the paid period + grace days); the entered key is stored next to the
+   settings and checked again at every start. Enforced in Rust (`vbs_evaluation::edition`): at import (files
    of further machines are not loaded), in the views sent to the UI (no hint keys, no effort values) and in the report
    writers (PDF refused; Excel without hint and effort columns). The customer/environment name is a setting in every
    edition; the logo is stored as a setting but only printed with an MSP license.
@@ -230,4 +246,6 @@ Later phases add: `worker/` + `tools/` license keys (5), `packaging/` winget + i
 - Platform APIs outside `crates/vbs-collector/src/platform/`; `unsafe` outside `platform/windows/`; msi.dll (MSI
   packages are parsed as files); Office automation, OLE or the Access database engine (documents and databases are
   parsed as files).
-- Committing secrets (Paddle keys, license signing key – Cloudflare Worker secret only).
+- Committing secrets (Paddle keys, license signing key – Cloudflare Worker secret only; `product.json` holds only the
+  public key). Signing code (`vbs-license` feature `issue`) in the app.
+- An installer that downloads anything (WebView2 bootstrapper) – `webviewInstallMode` stays `skip` (checked).

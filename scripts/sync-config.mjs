@@ -35,6 +35,7 @@ syncJson('src-tauri/tauri.conf.json', (conf) => {
   conf.productName = product.name;
   conf.identifier = product.identifier;
   for (const window of conf.app.windows) window.title = product.name;
+  conf.bundle.publisher = product.publisher;
 });
 
 // One version for the whole product: Cargo workspace ⇔ package.json.

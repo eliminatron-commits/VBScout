@@ -96,6 +96,12 @@ for (const window of conf.app?.windows ?? []) {
   }
 }
 if (conf.bundle?.createUpdaterArtifacts) errors.push('tauri.conf.json: updater artifacts are forbidden');
+// The installer must not download anything either: no WebView2 bootstrapper (the runtime ships with
+// Windows 10/11; `offlineInstaller` or `fixedRuntime` would embed it instead).
+const webviewInstall = conf.bundle?.windows?.webviewInstallMode?.type ?? 'downloadBootstrapper';
+if (!['skip', 'offlineInstaller', 'fixedRuntime'].includes(webviewInstall)) {
+  errors.push(`tauri.conf.json: bundle.windows.webviewInstallMode "${webviewInstall}" downloads during installation`);
+}
 for (const plugin of Object.keys(conf.plugins ?? {})) {
   if (FORBIDDEN_PLUGINS.includes(plugin)) errors.push(`tauri.conf.json: plugin "${plugin}" is forbidden`);
 }
@@ -118,7 +124,12 @@ const pkg = readJson('package.json');
 for (const name of Object.keys({ ...pkg.dependencies, ...pkg.devDependencies })) {
   if (FORBIDDEN_NPM.some((pattern) => pattern.test(name))) errors.push(`package.json: "${name}" is forbidden`);
 }
-const manifests = ['Cargo.toml', 'src-tauri/Cargo.toml', ...readdirSync(join(root, 'crates')).map((c) => `crates/${c}/Cargo.toml`)];
+const manifests = [
+  'Cargo.toml',
+  'src-tauri/Cargo.toml',
+  ...readdirSync(join(root, 'crates')).map((c) => `crates/${c}/Cargo.toml`),
+  ...readdirSync(join(root, 'tools')).map((c) => `tools/${c}/Cargo.toml`),
+];
 for (const manifest of manifests) {
   let table = '';
   for (const line of readText(manifest).split('\n')) {
@@ -152,7 +163,7 @@ for (const path of frontendFiles) {
 }
 const RUST_NETWORK =
   /\bstd::net\b|\bTcpStream\b|\bTcpListener\b|\bUdpSocket\b|\bto_socket_addrs\b|\breqwest::|\bureq::|\bhyper::|\bWinHttp\w*|\bInternet(?:Open|Connect|ReadFile)\w*|\bURLDownloadToFile\w*|\bWSAStartup\b|\bWNet(?:AddConnection|UseConnection)\w*|\bRegConnectRegistry\w*|\bgetaddrinfo\b|\bGetAddrInfo\w*/;
-for (const dir of ['crates', 'src-tauri/src']) {
+for (const dir of ['crates', 'src-tauri/src', 'tools']) {
   for (const path of walk(join(root, dir))) {
     if (!path.endsWith('.rs')) continue;
     const text = readFileSync(path, 'utf8');

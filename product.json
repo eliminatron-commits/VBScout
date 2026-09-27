@@ -3,6 +3,8 @@
   "identifier": "app.vbscout.desktop",
   "website": "https://vbscout.example",
   "supportEmail": "support@vbscout.example",
+  "publisher": "Example Publisher",
+  "releaseUrl": "https://github.com/eliminatron-commits/VBScout/releases/download/v{version}/{file}",
   "translationsUrl": "https://github.com/eliminatron-commits/VBScout/tree/main/i18n",
   "resultFile": {
     "extension": "vbscout",
@@ -16,7 +18,18 @@
   },
   "pricing": {
     "currency": "EUR",
-    "organization": { "amountMinor": 19900, "per": "organization", "billing": "oneTime" },
-    "msp": { "amountMinor": 59000, "per": "serviceProvider", "billing": "yearly" }
+    "organization": {
+      "amountMinor": 19900,
+      "per": "organization",
+      "billing": "oneTime"
+    },
+    "msp": {
+      "amountMinor": 59000,
+      "per": "serviceProvider",
+      "billing": "yearly"
+    }
+  },
+  "license": {
+    "publicKey": null
   }
 }

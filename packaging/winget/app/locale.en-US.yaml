@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.10.0.schema.json
+PackageIdentifier: {{id}}
+PackageVersion: {{version}}
+PackageLocale: en-US
+Publisher: {{publisher}}
+PublisherUrl: {{website}}
+PackageName: {{name}}
+PackageUrl: {{website}}
+License: FSL-1.1-ALv2 (source-available)
+ShortDescription: Finds VBScript dependencies in Windows environments before VBScript is disabled by default – evaluation and reports.
+Description: |-
+  Merges the result files of the free {{name}} Collector from any number of machines, rates the risk of every
+  VBScript dependency (scripts, scheduled tasks, autostart, services, WMI, logon scripts, installer packages,
+  Office macros) and produces a finding list, a management PDF and a technical Excel list. Works completely
+  offline: no telemetry, no update checks, license keys are verified on the computer.
+Tags:
+- vbscript
+- audit
+- migration
+- msp
+- sysadmin
+ManifestType: defaultLocale
+ManifestVersion: 1.10.0
