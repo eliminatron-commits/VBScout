@@ -1,39 +1,39 @@
-# Handoff — VBScout — 2026-09-26
+# Handoff — VBScout — 2026-09-27
 
 ## Stand
-Phase 2 (Sammler: Systemebene) ist abgeschlossen: ein Commit `Phase 2: Sammler: Systemebene` auf
-`claude/blissful-feynman-7hsvb9`; CI grün auf Linux, windows-2025 und windows-2022 (Tests, Korpus, ETW-/strace-Trace,
-Netztest, Nicht-Admin-Lauf, Systemtest mit echten Windows-Artefakten, Vollscan ohne interne Fehler) – Läufe und offene
-Punkte: PROGRESS.md. Beim Wiedereinstieg kurz prüfen, ob der Lauf des Abschluss-Commits grün ist.
+Phasen 1–3 abgeschlossen und gepusht (Branch `claude/blissful-feynman-7hsvb9`, HEAD 7fbdb88 „Phase 3: Sammler:
+Office-Makros“). Code-Stand von Phase 3 in CI-Lauf 36279662753 auf Linux, windows-2025 und windows-2022 vollständig grün
+(inkl. Systemtest, Vollscan mit Prüfung auf Windows-eigene Daten). Der letzte Amend 7fbdb88 ändert nur PROGRESS.md und
+docs/research-notes.md; sein CI-Lauf wurde noch nicht geprüft. Nachweise und offene Abweichungen: siehe PROGRESS.md.
 
 ## Offene Punkte (priorisiert)
-1. Phase 3/6 „Sammler: Office-Makros“ beginnen – laut Protokoll zuerst Ankündigung + Modellzeile, dann auf „weiter“ warten.
-2. Phase-3-Inhalt: Modul für Office-Dateien (OLE/CFB `vbaProject.bin`, OOXML-ZIP mit `vbaProject.bin`), VBA-Dekompression,
-   Regeln 6xx mit Quellen, Texte in 8 Sprachen, Korpusfälle; `PENDING_KINDS` in `tests/corpus.rs` leeren.
-3. Offene Punkte aus PROGRESS.md (4096-Format, Server 2016/Win10-Abnahme, Einordnung Windows-eigener Skripte in Phase 4).
+1. CI-Lauf für 7fbdb88 prüfen (MCP `mcp__github__actions_list` list_workflow_runs, Branch-Filter; owner
+   `eliminatron-commits`, repo `VBScout`); Lauf-ID später in PROGRESS.md (Nachweis Phase 3) nachtragen.
+2. Phase 4/6 „Auswertung und Berichte“ starten (bereits angekündigt, Nutzer hat noch nicht „weiter“ gesagt):
+   Import, Entdoppeln, Risikobewertung, Migrationshinweise, Aufwandsschätzung (Faustwerte sichtbar gekennzeichnet),
+   Protokoll-Abdeckung, Management-PDF, Excel-Liste, Gratis-Grenzen, Logo-/Organisationsfelder vorbereitet.
+   Abnahme: Zusammenführungs-Leistung (Spez. Punkt 5), Berichte vollständig en+de.
+3. In Phase 4 mit erledigen (PROGRESS.md, offene Punkte): Windows-eigene Funde (System32, WinSxS, Docker-Schichten)
+   als „Windows-Bestandteil“ einordnen und Duplikate zusammenfassen; gesperrte `Current.mdb` (User Access Logging)
+   entsprechend kennzeichnen; `cloudPlaceholder` in `docker\windowsfilter` bewerten.
 
 ## Wichtige Entscheidungen + Begründung
-- Registry nur mit `KEY_READ`, ohne WOW64-Flags (32-Bit-Sicht über `SOFTWARE\WOW6432Node`): Flags setzen Handle-Tags,
-  die der ETW-Trace sonst als „Set“ zählt; Handle-Tags aus Windows' COM/WMI-Code weist der Trace separat aus.
-- Hives nicht angemeldeter Benutzer werden als Datei gelesen (`analysis/regf.rs`), nie geladen.
-- MSI-Zeichenketten ≥ 64 KiB: Layout (0, Referenzen), (Low, High) wie Windows/Wine; msitools schreibt es anders
-  (Fixture `long-strings.msi` wird deshalb konvertiert).
-- Nicht prüfbare Befunde tragen `readError` (Leserfehler, ≤ 120 Zeichen); gesperrte Dateien = `locked`.
-
-## Bekannte Probleme / Blocker
-- learn/techcommunity/devblogs.microsoft.com und CI-Artefakt-Downloads (blob.core.windows.net) sind in der Umgebung
-  gesperrt: Quellen per Suchauszug, CI-Diagnose über die Job-Logs (GitHub-Releases und raw.githubusercontent.com gehen).
-- PowerShell-Fallen in den Windows-Skripten: Variablennamen case-insensitiv, Cmdlet-Ausgaben sind für COM in PSObject
-  verpackt (auspacken), `echo 0> datei` ist in cmd eine Umleitung (`(echo 0)> datei`).
+- Windows-Wartungsdaten (WinSxS-Differenziale PA30/PA31, komprimierte Nutzdaten DCx v1) und ESE-Datenbanken werden
+  am Inhalt erkannt und sind kein Befund; nie Überspringen nach Pfad (Regel „kein stilles Überspringen“) – daher bleibt
+  die gesperrte `Current.mdb` „nicht prüfbar“.
+- Protokoll je Phase: Ankündigung „Phase X/6 – …“, Modellempfehlung, auf „weiter“ warten; am Ende Abnahme prüfen,
+  ein Commit „Phase X: Name“ (Amend + `--force-with-lease` auf eigenem Branch), PROGRESS.md, 2–3 Sätze, nächste Phase
+  ankündigen. Kommunikation auf Deutsch. Commit-Nachricht Phase 3: Scratchpad `commit3.txt` (nicht im Repo).
 
 ## Relevante Pfade
-- `PROGRESS.md`, `CLAUDE.md` — Stand, Konventionen, verbotene Ansätze
-- `crates/vbs-core/src/module.rs`, `views.rs` — Modul-Schnittstelle, Views
-- `crates/vbs-collector/src/modules/`, `analysis/` — Module und Leser (Vorlage für Office: `msi.rs` mit `cfb`)
-- `rules/catalog.json`, `i18n/`, `docs/research-notes.md` — Regeln, Texte, Quellen (Abschnitt „Office / VBA“)
-- `tests/corpus/`, `crates/vbs-collector/tests/corpus.rs`, `tests/corpus/make-binaries.py` — Testsammlungen
+- PROGRESS.md — Stand, Nachweise, offene Punkte
+- crates/vbs-evaluation/ — Auswertungslogik (Phase 4 baut hier)
+- src-tauri/, src/ — App-Shell und Frontend (nur Anzeige)
+- docs/result-format.md, docs/result.schema.json — Ergebnisformat, das die Auswertung importiert
+- rules/catalog.json, i18n/ — Regeln (breaks/review) und Texte für Berichte
+- product.json — Gratis-Grenze (`editions.free.maxMachines`), Name, Preise
 
 ## Empfehlung für Fortsetzung
 - Modell: Opus 5.5
-- Effort: hoch – Binärformate (CFB, VBA-Kompression, OOXML) und Passwort-/Verschlüsselungsfälle strikt nur lesend
-- Erster Schritt: CI-Lauf des Abschluss-Commits prüfen, dann Phase-3-Ankündigung ausgeben und auf „weiter“ warten
+- Effort: mittel – umfangreiche, aber klar spezifizierte Umsetzung auf vorhandenem Ergebnismodell und Import
+- Erster Schritt: CI-Lauf für 7fbdb88 prüfen, dann Phase 4 mit „weiter“ beginnen (Spezifikation Phase 4 aus PROGRESS.md/CLAUDE.md, Entscheidung 9 Editionen).
