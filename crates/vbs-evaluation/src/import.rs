@@ -4,7 +4,9 @@
 //! files on a share). Folders are searched recursively for the result file
 //! extension; all files are read in parallel. A file that cannot be read is
 //! reported with its reason – it never disappears silently – and a run that
-//! is already loaded (same scan ID) is counted as a duplicate.
+//! is already loaded (same scan ID) is counted as a duplicate. The edition's
+//! machine limit is enforced here: files of further machines are listed as
+//! not loaded (another scan of a machine that is already loaded is fine).
 
 use std::collections::HashSet;
 use std::fs;
@@ -13,6 +15,8 @@ use std::sync::Mutex;
 
 use uuid::Uuid;
 use vbs_core::{FormatError, ScanResult};
+
+use crate::assessment::MachineKey;
 
 /// A successfully read result file.
 #[derive(Debug, Clone, PartialEq)]
@@ -75,6 +79,24 @@ pub struct ImportBatch {
     pub errors: Vec<ImportError>,
     /// Files whose scan is already loaded (or appears twice in this batch).
     pub duplicates: Vec<PathBuf>,
+    /// Files of further machines that the edition's machine limit does not allow.
+    pub over_limit: Vec<PathBuf>,
+}
+
+/// What is loaded already: scan IDs (duplicates) and machines (the machine limit).
+#[derive(Debug, Clone, Default)]
+pub struct LoadedState {
+    pub scan_ids: HashSet<Uuid>,
+    pub machines: HashSet<MachineKey>,
+}
+
+impl LoadedState {
+    pub fn of(files: &[ImportedFile]) -> Self {
+        Self {
+            scan_ids: files.iter().map(|file| file.result.scan_id).collect(),
+            machines: files.iter().map(|file| MachineKey::of(&file.result)).collect(),
+        }
+    }
 }
 
 /// Expands `paths` – files as given, folders recursively (result files only) – in a stable order.
@@ -110,18 +132,29 @@ pub fn collect_paths(paths: &[PathBuf]) -> (Vec<PathBuf>, Vec<ImportError>) {
     (files, errors)
 }
 
-/// Reads all result files under `paths` in parallel. Scans whose ID is in
-/// `loaded` (or that appear twice) are reported as duplicates.
-pub fn import(paths: &[PathBuf], loaded: &HashSet<Uuid>) -> ImportBatch {
+/// Reads all result files under `paths` in parallel. Scans that are already
+/// `loaded` (or appear twice) are reported as duplicates; files of more distinct
+/// machines than `machine_limit` allows are reported as over the limit.
+pub fn import(paths: &[PathBuf], loaded: &LoadedState, machine_limit: Option<usize>) -> ImportBatch {
     let (files, mut errors) = collect_paths(paths);
     let results = read_parallel(&files);
 
     let mut batch = ImportBatch::default();
-    let mut seen = loaded.clone();
+    let mut seen = loaded.scan_ids.clone();
+    let mut machines = loaded.machines.clone();
     for (path, outcome) in files.into_iter().zip(results) {
         match outcome {
-            Ok(file) if !seen.insert(file.result.scan_id) => batch.duplicates.push(path),
-            Ok(file) => batch.files.push(file),
+            Ok(file) if seen.contains(&file.result.scan_id) => batch.duplicates.push(path),
+            Ok(file) => {
+                let machine = MachineKey::of(&file.result);
+                if !machines.contains(&machine) && machine_limit.is_some_and(|limit| machines.len() >= limit) {
+                    batch.over_limit.push(path);
+                    continue;
+                }
+                seen.insert(file.result.scan_id);
+                machines.insert(machine);
+                batch.files.push(file);
+            }
             Err(problem) => errors.push(ImportError { path, problem }),
         }
     }
@@ -217,7 +250,7 @@ mod tests {
         fs::write(nested.join(format!("broken.{extension}")), b"not a zip").unwrap();
         fs::write(nested.join("notes.txt"), b"ignored").unwrap();
 
-        let batch = import(&[dir.path().to_path_buf()], &HashSet::new());
+        let batch = import(&[dir.path().to_path_buf()], &LoadedState::default(), None);
         let mut hosts: Vec<_> = batch.files.iter().map(|f| f.result.machine.hostname.as_str()).collect();
         hosts.sort_unstable();
         assert_eq!(hosts, ["PC-1", "PC-2"]);
@@ -226,13 +259,32 @@ mod tests {
         assert_eq!(batch.errors[0].problem, ImportProblem::NotAResultFile);
 
         // Importing again: everything is a duplicate now.
-        let loaded: HashSet<Uuid> = batch.files.iter().map(|f| f.result.scan_id).collect();
-        let again = import(&[dir.path().to_path_buf()], &loaded);
+        let loaded = LoadedState::of(&batch.files);
+        let again = import(&[dir.path().to_path_buf()], &loaded, None);
         assert!(again.files.is_empty());
         assert_eq!(again.duplicates.len(), 3);
 
-        let missing = import(&[dir.path().join("missing")], &HashSet::new());
+        let missing = import(&[dir.path().join("missing")], &LoadedState::default(), None);
         assert_eq!(missing.errors[0].problem.code(), "io");
+    }
+
+    #[test]
+    fn the_machine_limit_is_enforced_on_import() {
+        let dir = tempfile::tempdir().unwrap();
+        let extension = vbs_core::file_extension();
+        for host in ["PC-1", "PC-2", "PC-3"] {
+            write(&dir.path().join(format!("{host}.{extension}")), &sample(host));
+        }
+        let batch = import(&[dir.path().to_path_buf()], &LoadedState::default(), Some(2));
+        assert_eq!(batch.files.len(), 2);
+        assert_eq!(batch.over_limit.len(), 1);
+        assert!(batch.over_limit[0].ends_with(format!("PC-3.{extension}")), "stable order: by path");
+
+        // A newer scan of a loaded machine is still accepted at the limit.
+        let loaded = LoadedState::of(&batch.files);
+        write(&dir.path().join(format!("PC-1-again.{extension}")), &sample("PC-1"));
+        let again = import(&[dir.path().join(format!("PC-1-again.{extension}"))], &loaded, Some(2));
+        assert_eq!((again.files.len(), again.over_limit.len()), (1, 0));
     }
 
     #[test]

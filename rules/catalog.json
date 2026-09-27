@@ -160,173 +160,307 @@
     }
   ],
   "rules": [
-    { "id": "VBS-100", "kind": "scriptFile", "classification": "review", "sources": ["ms-vbscript-timeline"] },
+    {
+      "id": "VBS-100",
+      "kind": "scriptFile",
+      "classification": "review",
+      "sources": ["ms-vbscript-timeline"],
+      "effort": { "minHours": 0.25, "maxHours": 1 },
+      "hint": "notCheckable"
+    },
     {
       "id": "VBS-101",
       "kind": "scriptFile",
       "classification": "breaks",
-      "sources": ["ms-deprecated-features", "ms-vbscript-timeline"]
+      "sources": ["ms-deprecated-features", "ms-vbscript-timeline"],
+      "effort": { "minHours": 1, "maxHours": 4, "basis": "scriptSize" },
+      "hint": "rewriteScript"
     },
     {
       "id": "VBS-102",
       "kind": "scriptFile",
       "classification": "breaks",
-      "sources": ["ms-deprecated-features", "ms-vbscript-timeline", "ms-script-encoder"]
+      "sources": ["ms-deprecated-features", "ms-vbscript-timeline", "ms-script-encoder"],
+      "effort": { "minHours": 1, "maxHours": 4, "basis": "scriptSize" },
+      "hint": "rewriteScript"
     },
     {
       "id": "VBS-103",
       "kind": "scriptFile",
       "classification": "breaks",
-      "sources": ["ms-deprecated-features", "ms-vbscript-timeline", "ms-wsh-script-element"]
+      "sources": ["ms-deprecated-features", "ms-vbscript-timeline", "ms-wsh-script-element"],
+      "effort": { "minHours": 1, "maxHours": 4, "basis": "scriptSize" },
+      "hint": "rewriteScript"
     },
     {
       "id": "VBS-104",
       "kind": "scriptFile",
       "classification": "breaks",
-      "sources": ["ms-deprecated-features", "ms-vbscript-timeline", "ms-wsh-script-element"]
+      "sources": ["ms-deprecated-features", "ms-vbscript-timeline", "ms-wsh-script-element"],
+      "effort": { "minHours": 2, "maxHours": 8, "basis": "scriptSize" },
+      "hint": "scriptComponent"
     },
     {
       "id": "VBS-105",
       "kind": "scriptFile",
       "classification": "breaks",
-      "sources": ["ms-deprecated-features", "ms-vbscript-timeline", "ms-hta"]
+      "sources": ["ms-deprecated-features", "ms-vbscript-timeline", "ms-hta"],
+      "effort": { "minHours": 4, "maxHours": 16, "basis": "scriptSize" },
+      "hint": "htmlApplication"
     },
 
-    { "id": "VBS-200", "kind": "scriptInvocation", "classification": "review", "sources": ["ms-vbscript-timeline"] },
+    {
+      "id": "VBS-200",
+      "kind": "scriptInvocation",
+      "classification": "review",
+      "sources": ["ms-vbscript-timeline"],
+      "effort": { "minHours": 0.25, "maxHours": 1 },
+      "hint": "notCheckable"
+    },
     {
       "id": "VBS-201",
       "kind": "scriptInvocation",
       "classification": "breaks",
-      "sources": ["ms-deprecated-features", "ms-vbscript-timeline", "ms-wscript-command"]
+      "sources": ["ms-deprecated-features", "ms-vbscript-timeline", "ms-wscript-command"],
+      "effort": { "minHours": 0.25, "maxHours": 1, "basis": "entry" },
+      "hint": "callingScript"
     },
     {
       "id": "VBS-202",
       "kind": "scriptInvocation",
       "classification": "review",
-      "sources": ["ms-wsh-script-element", "ms-hta"]
+      "sources": ["ms-wsh-script-element", "ms-hta"],
+      "effort": { "minHours": 0.25, "maxHours": 1 },
+      "hint": "unknownLanguage"
     },
     {
       "id": "VBS-211",
       "kind": "shortcut",
       "classification": "breaks",
-      "sources": ["ms-deprecated-features", "ms-vbscript-timeline", "ms-wscript-command"]
+      "sources": ["ms-deprecated-features", "ms-vbscript-timeline", "ms-wscript-command"],
+      "effort": { "minHours": 0.1, "maxHours": 0.5, "basis": "entry" },
+      "hint": "shortcut"
     },
-    { "id": "VBS-212", "kind": "shortcut", "classification": "review", "sources": ["ms-wsh-script-element", "ms-hta"] },
+    {
+      "id": "VBS-212",
+      "kind": "shortcut",
+      "classification": "review",
+      "sources": ["ms-wsh-script-element", "ms-hta"],
+      "effort": { "minHours": 0.1, "maxHours": 0.5 },
+      "hint": "unknownLanguage"
+    },
 
-    { "id": "VBS-300", "kind": "scheduledTask", "classification": "review", "sources": ["ms-vbscript-timeline"] },
+    {
+      "id": "VBS-300",
+      "kind": "scheduledTask",
+      "classification": "review",
+      "sources": ["ms-vbscript-timeline"],
+      "effort": { "minHours": 0.25, "maxHours": 1 },
+      "hint": "notCheckable"
+    },
     {
       "id": "VBS-301",
       "kind": "scheduledTask",
       "classification": "breaks",
-      "sources": ["ms-vbscript-detection", "ms-task-exec", "ms-vbscript-timeline"]
+      "sources": ["ms-vbscript-detection", "ms-task-exec", "ms-vbscript-timeline"],
+      "effort": { "minHours": 0.5, "maxHours": 2, "basis": "entry" },
+      "hint": "scheduledTask"
     },
     {
       "id": "VBS-302",
       "kind": "scheduledTask",
       "classification": "review",
-      "sources": ["ms-task-exec", "ms-wsh-script-element"]
+      "sources": ["ms-task-exec", "ms-wsh-script-element"],
+      "effort": { "minHours": 0.25, "maxHours": 1 },
+      "hint": "unknownLanguage"
     },
     {
       "id": "VBS-311",
       "kind": "autostart",
       "classification": "breaks",
-      "sources": ["ms-run-keys", "ms-vbscript-timeline"]
+      "sources": ["ms-run-keys", "ms-vbscript-timeline"],
+      "effort": { "minHours": 0.25, "maxHours": 1, "basis": "entry" },
+      "hint": "autostart"
     },
-    { "id": "VBS-312", "kind": "autostart", "classification": "review", "sources": ["ms-run-keys", "ms-wsh-script-element"] },
+    {
+      "id": "VBS-312",
+      "kind": "autostart",
+      "classification": "review",
+      "sources": ["ms-run-keys", "ms-wsh-script-element"],
+      "effort": { "minHours": 0.25, "maxHours": 1 },
+      "hint": "unknownLanguage"
+    },
     {
       "id": "VBS-321",
       "kind": "service",
       "classification": "breaks",
-      "sources": ["ms-vbscript-detection", "ms-vbscript-timeline"]
+      "sources": ["ms-vbscript-detection", "ms-vbscript-timeline"],
+      "effort": { "minHours": 1, "maxHours": 4, "basis": "entry" },
+      "hint": "service"
     },
-    { "id": "VBS-322", "kind": "service", "classification": "review", "sources": ["ms-wsh-script-element"] },
+    {
+      "id": "VBS-322",
+      "kind": "service",
+      "classification": "review",
+      "sources": ["ms-wsh-script-element"],
+      "effort": { "minHours": 0.5, "maxHours": 2 },
+      "hint": "unknownLanguage"
+    },
     {
       "id": "VBS-331",
       "kind": "wmiSubscription",
       "classification": "breaks",
-      "sources": ["ms-wmi-activescript", "ms-vbscript-timeline"]
+      "sources": ["ms-wmi-activescript", "ms-vbscript-timeline"],
+      "effort": { "minHours": 1, "maxHours": 4, "basis": "entry" },
+      "hint": "wmiSubscription"
     },
     {
       "id": "VBS-332",
       "kind": "wmiSubscription",
       "classification": "review",
-      "sources": ["ms-wmi-activescript", "ms-wsh-script-element"]
+      "sources": ["ms-wmi-activescript", "ms-wsh-script-element"],
+      "effort": { "minHours": 0.5, "maxHours": 2 },
+      "hint": "unknownLanguage"
     },
     {
       "id": "VBS-341",
       "kind": "logonScript",
       "classification": "breaks",
-      "sources": ["ms-gpscr-scripts-ini", "ms-vbscript-detection", "ms-vbscript-timeline"]
+      "sources": ["ms-gpscr-scripts-ini", "ms-vbscript-detection", "ms-vbscript-timeline"],
+      "effort": { "minHours": 1, "maxHours": 4, "basis": "entry" },
+      "hint": "logonScript"
     },
     {
       "id": "VBS-342",
       "kind": "logonScript",
       "classification": "review",
-      "sources": ["ms-gpscr-scripts-ini", "ms-wsh-script-element"]
+      "sources": ["ms-gpscr-scripts-ini", "ms-wsh-script-element"],
+      "effort": { "minHours": 0.5, "maxHours": 2 },
+      "hint": "unknownLanguage"
     },
 
-    { "id": "VBS-400", "kind": "msiCustomAction", "classification": "review", "sources": ["ms-vbscript-detection"] },
+    {
+      "id": "VBS-400",
+      "kind": "msiCustomAction",
+      "classification": "review",
+      "sources": ["ms-vbscript-detection"],
+      "effort": { "minHours": 0.5, "maxHours": 2 },
+      "hint": "notCheckable"
+    },
     {
       "id": "VBS-401",
       "kind": "msiCustomAction",
       "classification": "breaks",
-      "sources": ["ms-vbscript-detection", "ms-msi-ca-types", "ms-msi-ca-type-6"]
+      "sources": ["ms-vbscript-detection", "ms-msi-ca-types", "ms-msi-ca-type-6"],
+      "effort": { "minHours": 2, "maxHours": 8 },
+      "hint": "installerPackage"
     },
     {
       "id": "VBS-402",
       "kind": "msiCustomAction",
       "classification": "review",
-      "sources": ["ms-msi-ca-return", "ms-msi-ca-types"]
+      "sources": ["ms-msi-ca-return", "ms-msi-ca-types"],
+      "effort": { "minHours": 0.5, "maxHours": 2 },
+      "hint": "installerPackage"
     },
 
-    { "id": "VBS-500", "kind": "eventLogUsage", "classification": "review", "sources": ["ms-vbscript-detection"] },
+    {
+      "id": "VBS-500",
+      "kind": "eventLogUsage",
+      "classification": "review",
+      "sources": ["ms-vbscript-detection"],
+      "effort": { "minHours": 0.25, "maxHours": 1 },
+      "hint": "notCheckable"
+    },
     {
       "id": "VBS-501",
       "kind": "eventLogUsage",
       "classification": "breaks",
-      "sources": ["ms-vbscript-status-2026-09", "ms-vbscript-timeline"]
+      "sources": ["ms-vbscript-status-2026-09", "ms-vbscript-timeline"],
+      "effort": { "minHours": 0.5, "maxHours": 2 },
+      "hint": "loggedUse"
     },
     {
       "id": "VBS-502",
       "kind": "eventLogUsage",
       "classification": "breaks",
-      "sources": ["ms-vbscript-detection", "ms-sysmon"]
+      "sources": ["ms-vbscript-detection", "ms-sysmon"],
+      "effort": { "minHours": 0.5, "maxHours": 2 },
+      "hint": "loggedUse"
     },
     {
       "id": "VBS-503",
       "kind": "eventLogUsage",
       "classification": "review",
-      "sources": ["ms-vbscript-detection", "ms-sysmon"]
+      "sources": ["ms-vbscript-detection", "ms-sysmon"],
+      "effort": { "minHours": 0.5, "maxHours": 2 },
+      "hint": "engineLoaded"
     },
 
-    { "id": "VBS-600", "kind": "officeMacro", "classification": "review", "sources": ["ms-vba-vbscript", "ms-offcrypto", "ms-ovba"] },
+    {
+      "id": "VBS-600",
+      "kind": "officeMacro",
+      "classification": "review",
+      "sources": ["ms-vba-vbscript", "ms-offcrypto", "ms-ovba"],
+      "effort": { "minHours": 0.25, "maxHours": 1 },
+      "hint": "notCheckable"
+    },
     {
       "id": "VBS-601",
       "kind": "officeMacro",
       "classification": "breaks",
-      "sources": ["ms-vba-vbscript", "ms-vbscript-timeline"]
+      "sources": ["ms-vba-vbscript", "ms-vbscript-timeline"],
+      "effort": { "minHours": 0.5, "maxHours": 2 },
+      "hint": "regExp"
     },
     {
       "id": "VBS-611",
       "kind": "officeMacro",
       "classification": "breaks",
-      "sources": ["ms-script-control", "ms-execscript", "ms-deprecated-features", "ms-vbscript-timeline"]
+      "sources": ["ms-script-control", "ms-execscript", "ms-deprecated-features", "ms-vbscript-timeline"],
+      "effort": { "minHours": 1, "maxHours": 4 },
+      "hint": "scriptControl"
     },
-    { "id": "VBS-612", "kind": "officeMacro", "classification": "review", "sources": ["ms-script-control", "ms-execscript"] },
+    {
+      "id": "VBS-612",
+      "kind": "officeMacro",
+      "classification": "review",
+      "sources": ["ms-script-control", "ms-execscript"],
+      "effort": { "minHours": 0.5, "maxHours": 2 },
+      "hint": "scriptControl"
+    },
     {
       "id": "VBS-621",
       "kind": "officeMacro",
       "classification": "breaks",
-      "sources": ["ms-vba-vbscript", "ms-wscript-command", "ms-vbscript-timeline"]
+      "sources": ["ms-vba-vbscript", "ms-wscript-command", "ms-vbscript-timeline"],
+      "effort": { "minHours": 0.5, "maxHours": 2, "basis": "entry" },
+      "hint": "macroStartsScript"
     },
     {
       "id": "VBS-622",
       "kind": "officeMacro",
       "classification": "review",
-      "sources": ["ms-wsh-script-element", "ms-hta"]
+      "sources": ["ms-wsh-script-element", "ms-hta"],
+      "effort": { "minHours": 0.25, "maxHours": 1 },
+      "hint": "unknownLanguage"
     },
-    { "id": "VBS-632", "kind": "officeMacro", "classification": "review", "sources": ["ms-vba-vbscript", "ms-vbscript-timeline"] },
+    {
+      "id": "VBS-632",
+      "kind": "officeMacro",
+      "classification": "review",
+      "sources": ["ms-vba-vbscript", "ms-vbscript-timeline"],
+      "effort": { "minHours": 0.25, "maxHours": 2 },
+      "hint": "wshObjects"
+    },
 
-    { "id": "VBS-901", "kind": "hardcodedCredential", "classification": "review", "sources": ["mitre-cwe-798"] }
+    {
+      "id": "VBS-901",
+      "kind": "hardcodedCredential",
+      "classification": "review",
+      "sources": ["mitre-cwe-798"],
+      "effort": { "minHours": 0.5, "maxHours": 2 },
+      "hint": "credentials"
+    }
   ]
 }

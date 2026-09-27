@@ -23,9 +23,15 @@ vbs-license = { path = "crates/vbs-license" }
 # OLE compound files (MSI packages; Office documents in phase 3), read through a read-only handle.
 cfb = "0.10"
 jsonschema = { version = "0.58", default-features = false }
+# Management PDF of the evaluation: text with an embedded, subset font (shaping via rustybuzz,
+# which also measures text for line breaks) and PNG/JPEG logos. Pure Rust, no network.
+krilla = { version = "0.8", default-features = false, features = ["raster-images", "simple-text"] }
 lexopt = "0.3"
 # Native file dialogs for the evaluation (no Tauri dialog/fs plugins, no frontend permissions).
 rfd = { version = "0.17", default-features = false, features = ["gtk3"] }
+# Technical Excel list of the evaluation (writes .xlsx in memory; pure Rust, no network).
+rust_xlsxwriter = { version = "0.99", default-features = false }
+rustybuzz = "0.20"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.11"

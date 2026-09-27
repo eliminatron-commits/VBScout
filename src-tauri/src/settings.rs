@@ -12,6 +12,8 @@ use vbs_i18n::Lang;
 pub struct Settings {
     /// UI language tag; `None` follows the operating system.
     pub ui_language: Option<String>,
+    /// Customer or environment named in the reports.
+    pub report_customer: Option<String>,
 }
 
 impl Settings {
@@ -51,7 +53,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("nested").join("settings.json");
         assert_eq!(Settings::load(&path), Settings::default());
-        let settings = Settings { ui_language: Some("pl".into()) };
+        let settings = Settings { ui_language: Some("pl".into()), report_customer: Some("Muster AG".into()) };
         settings.save(&path).unwrap();
         assert_eq!(Settings::load(&path), settings);
         fs::write(&path, b"{ not json").unwrap();
@@ -63,7 +65,7 @@ mod tests {
         let system = Settings::default();
         assert_eq!(system.ui_lang(Some("de-CH")), Lang::De);
         assert_eq!(system.ui_lang(None), Lang::En);
-        let explicit = Settings { ui_language: Some("pt-BR".into()) };
+        let explicit = Settings { ui_language: Some("pt-BR".into()), ..Settings::default() };
         assert_eq!(explicit.ui_lang(Some("de-DE")), Lang::PtBr);
     }
 }

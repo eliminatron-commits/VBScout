@@ -75,17 +75,36 @@ pub struct Rule {
     pub classification: Classification,
     /// IDs of the sources backing the classification.
     pub sources: Vec<String>,
-    /// Rule-of-thumb effort per finding (filled in with the evaluation, phase 4).
-    #[serde(default)]
-    pub effort: Option<Effort>,
+    /// Rule-of-thumb effort per finding, used by the evaluation.
+    pub effort: Effort,
+    /// Migration hint: the text `hint.<id>` in `i18n/<lang>.json`, shared by rules that are
+    /// migrated the same way.
+    pub hint: String,
 }
 
-/// Rough effort estimate in hours – always presented as a rule of thumb.
+/// Rough effort estimate in hours – always presented as a rule of thumb, never as a quote.
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Effort {
     pub min_hours: f64,
     pub max_hours: f64,
+    #[serde(default)]
+    pub basis: EffortBasis,
+}
+
+/// What the effort range refers to.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum EffortBasis {
+    /// The range as given (checking or changing one item).
+    #[default]
+    Fixed,
+    /// Code to rewrite: the range grows with the size of the script file.
+    ScriptSize,
+    /// An entry that starts a script (task, autostart value, shortcut, …): changing the entry.
+    /// The script itself is counted where the scan found it – or with the effort of a typical
+    /// script when the scan did not find it.
+    Entry,
 }
 
 impl Rule {
@@ -100,6 +119,10 @@ impl Rule {
 
     pub fn rationale_key(&self) -> String {
         format!("rule.{}.rationale", self.key_stem())
+    }
+
+    pub fn hint_key(&self) -> String {
+        format!("hint.{}", self.hint)
     }
 }
 
@@ -176,10 +199,12 @@ impl RuleCatalog {
                 }
                 referenced.insert(source.as_str());
             }
-            if let Some(effort) = rule.effort
-                && !(effort.min_hours > 0.0 && effort.min_hours <= effort.max_hours)
-            {
-                return Err(format!("rule {}: effort must satisfy 0 < minHours ≤ maxHours", rule.id));
+            let effort = rule.effort;
+            if !(effort.min_hours > 0.0 && effort.min_hours <= effort.max_hours && effort.max_hours <= 100.0) {
+                return Err(format!("rule {}: effort must satisfy 0 < minHours ≤ maxHours ≤ 100", rule.id));
+            }
+            if rule.hint.is_empty() || !rule.hint.chars().all(|c| c.is_ascii_alphanumeric()) {
+                return Err(format!("rule {}: hint must be a camelCase identifier", rule.id));
             }
             if rule.id.ends_with("00") && rule.classification != Classification::Review {
                 return Err(format!("rule {}: \"could not be checked\" rules are always review", rule.id));
@@ -215,7 +240,7 @@ mod tests {
     #[test]
     fn every_rule_has_translated_texts() {
         for rule in &catalog().rules {
-            for key in [rule.title_key(), rule.rationale_key()] {
+            for key in [rule.title_key(), rule.rationale_key(), rule.hint_key()] {
                 assert!(vbs_i18n::has_key(&key), "i18n/en.json lacks {key}");
             }
         }
@@ -224,8 +249,12 @@ mod tests {
     #[test]
     fn rejects_invalid_catalogs() {
         type Mutation = (&'static str, fn(&mut serde_json::Value));
-        let mutations: [Mutation; 7] = [
+        let mutations: [Mutation; 11] = [
             ("classification", |c| c["rules"][0]["classification"] = "harmless".into()),
+            ("effort order", |c| c["rules"][0]["effort"]["minHours"] = 9.0.into()),
+            ("effort basis", |c| c["rules"][0]["effort"]["basis"] = "perMachine".into()),
+            ("missing effort", |c| drop(c["rules"][0].as_object_mut().map(|rule| rule.remove("effort")))),
+            ("hint", |c| c["rules"][0]["hint"] = "not a key".into()),
             ("missing sources", |c| c["rules"][0]["sources"] = serde_json::json!([])),
             ("unknown source", |c| c["rules"][0]["sources"] = serde_json::json!(["nope"])),
             ("rule id", |c| c["rules"][0]["id"] = "R1".into()),

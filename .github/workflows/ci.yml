@@ -52,7 +52,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev librsvg2-dev \
-            libayatana-appindicator3-dev xvfb strace dbus
+            libayatana-appindicator3-dev xvfb strace dbus poppler-utils
       - name: Rust toolchain (rust-toolchain.toml)
         run: |
           rustup show active-toolchain || rustup toolchain install
@@ -76,9 +76,22 @@ jobs:
         run: node scripts/check-offline.mjs --cargo
       - name: Scan performance (100,000 files, limit 10 minutes)
         run: cargo test --release --locked -p vbs-collector --test performance -- --ignored --nocapture
+      - name: Merge performance (1,000 result files, limit 1 minute)
+        run: cargo test --release --locked -p vbs-evaluation --test merge_performance -- --ignored --nocapture
 
       - name: Build collector (release)
         run: cargo build --release --locked -p vbs-collector
+      - name: Reports in eight languages (read back with pdftotext and the Python standard library)
+        run: |
+          mkdir -p reports-out/free
+          cargo build --release --locked -p vbs-evaluation --example report
+          target/release/vbs-collector --path "$PWD/tests/corpus" --out reports-out/corpus.vbscout --quiet
+          for lang in en de fr es it nl pl pt-BR; do
+            target/release/examples/report --out reports-out --lang "$lang" --sample 40 \
+              --edition 'msp:Example IT Services' --customer 'Example Customer' reports-out/corpus.vbscout
+            target/release/examples/report --out reports-out/free --lang "$lang" --edition free reports-out/corpus.vbscout
+          done
+          python3 scripts/reports/check.py reports-out --free reports-out/free
       - name: Read-only trace (strace, collector)
         run: bash scripts/readonly/linux.sh target/release/vbs-collector tests/corpus readonly-out
       - name: Network block test (collector)
@@ -94,6 +107,14 @@ jobs:
           path: |
             readonly-out/
             nettest-out/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Upload sample reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports-sample
+          path: reports-out/
           if-no-files-found: ignore
           retention-days: 14
 
@@ -150,6 +171,9 @@ jobs:
       - name: Scan performance (100,000 files, limit 10 minutes)
         if: ${{ !cancelled() && steps.collector.outcome == 'success' }}
         run: cargo test --release --locked -p vbs-collector --test performance -- --ignored --nocapture
+      - name: Merge performance (1,000 result files, limit 1 minute)
+        if: ${{ !cancelled() }}
+        run: cargo test --release --locked -p vbs-evaluation --test merge_performance -- --ignored --nocapture
 
       - name: Read-only trace (ETW, collector)
         if: ${{ !cancelled() && steps.collector.outcome == 'success' }}
@@ -230,6 +254,21 @@ jobs:
           }
           if ($windowsData.Count) { throw "$($windowsData.Count) findings for Windows servicing data or ESE databases" }
 
+      - name: Reports of this machine's full scan (what an organization would get)
+        if: ${{ !cancelled() && steps.collector.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          cargo build --release --locked -p vbs-evaluation --example report
+          if ($LASTEXITCODE) { throw 'build failed' }
+          New-Item -ItemType Directory -Force reports-out | Out-Null
+          foreach ($lang in 'en', 'de') {
+            $arguments = @('--out', 'reports-out', '--lang', $lang, '--edition', 'organization:CI runner', '--customer', $env:RUNNER_NAME)
+            if ($lang -eq 'en') { $arguments += '--list' }
+            & target\release\examples\report.exe @arguments collector-out
+            if ($LASTEXITCODE) { throw "report example failed ($lang)" }
+          }
+          Get-ChildItem reports-out | Format-Table Name, Length
+
       - name: Upload trace logs
         if: always()
         uses: actions/upload-artifact@v7
@@ -243,6 +282,7 @@ jobs:
             systemtest-out/
             collector-out/full-scan-result.json
             collector-imports.txt
+            reports-out/
           if-no-files-found: ignore
           retention-days: 14
       - name: Upload programs (development builds, unsigned)

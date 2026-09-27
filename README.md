@@ -6,8 +6,9 @@ deprecated VBScript; it is expected to be disabled by default in a later phase (
 as of 2026-09-26) and to be removed afterwards. VBScout shows what would break – scripts, scheduled tasks, logon
 scripts, services, installer actions and Office macros – and helps plan the migration.
 
-> **Status:** in development (foundation phase). The collector already runs and writes valid result files; the
-> finding types follow in the next phases.
+> **Status:** in development. The collector finds all finding types (system level and Office macros); the
+> evaluation merges result files and creates the management PDF and the technical Excel list. Licensing, packages
+> and the website follow.
 
 ## How it works
 

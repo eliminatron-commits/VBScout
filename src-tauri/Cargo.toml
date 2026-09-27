@@ -23,6 +23,7 @@ vbs-config.workspace = true
 vbs-core.workspace = true
 vbs-evaluation.workspace = true
 vbs-i18n.workspace = true
+vbs-license.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

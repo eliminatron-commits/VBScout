@@ -5,7 +5,6 @@
 
 mod common;
 
-use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::fs::{self, File};
 use std::io::Read;
@@ -80,7 +79,8 @@ fn result_file_is_schema_valid_and_readable_by_the_evaluation() {
     assert!(result.coverage.sources.iter().any(|source| source.source == "files.paths" && source.entries > 0));
 
     // … and so does the evaluation's import.
-    let batch = vbs_evaluation::import::import(std::slice::from_ref(&out_dir), &HashSet::new());
+    let loaded = vbs_evaluation::import::LoadedState::default();
+    let batch = vbs_evaluation::import::import(std::slice::from_ref(&out_dir), &loaded, None);
     assert!(batch.errors.is_empty(), "{:?}", batch.errors);
     assert_eq!(batch.files.len(), 1);
     assert_eq!(batch.files[0].result.scan_id, result.scan_id);

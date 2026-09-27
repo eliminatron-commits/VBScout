@@ -72,6 +72,10 @@ pub struct ImportSummary {
     pub cancelled: bool,
     pub loaded: usize,
     pub duplicates: usize,
+    /// Files of further machines that the edition's machine limit did not allow.
+    pub over_limit: usize,
+    /// The edition's machine limit; `None` = unlimited.
+    pub machine_limit: Option<usize>,
     pub errors: Vec<ImportErrorView>,
     /// Some files contain values from a newer version (shown simplified).
     pub newer_values: bool,
@@ -80,10 +84,19 @@ pub struct ImportSummary {
 
 impl ImportSummary {
     pub fn cancelled(machines: Vec<MachineSummary>) -> Self {
-        Self { cancelled: true, loaded: 0, duplicates: 0, errors: Vec::new(), newer_values: false, machines }
+        Self {
+            cancelled: true,
+            loaded: 0,
+            duplicates: 0,
+            over_limit: 0,
+            machine_limit: None,
+            errors: Vec::new(),
+            newer_values: false,
+            machines,
+        }
     }
 
-    pub fn from_batch(batch: &ImportBatch, machines: Vec<MachineSummary>) -> Self {
+    pub fn from_batch(batch: &ImportBatch, machines: Vec<MachineSummary>, machine_limit: Option<usize>) -> Self {
         let errors = batch
             .errors
             .iter()
@@ -109,6 +122,8 @@ impl ImportSummary {
             cancelled: false,
             loaded: batch.files.len(),
             duplicates: batch.duplicates.len(),
+            over_limit: batch.over_limit.len(),
+            machine_limit,
             errors,
             newer_values: batch.files.iter().any(|file| file.unknown_values > 0),
             machines,

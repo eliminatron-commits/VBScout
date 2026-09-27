@@ -7,8 +7,9 @@
 //  2. Placeholders match the English source ({count} may be spelled out).
 //  3. No empty or padded messages; the product name only via {product}.
 //  4. Every key used in the code exists: t("…"), tc("…"), key("…") in
-//     TypeScript/Svelte and t(lang, "…"), t_args(…), t_count(…), key("…") and
-//     the collector console's info/error/text("…") in Rust.
+//     TypeScript/Svelte and t(lang, "…"), t_args(…), t_count(…), key("…"),
+//     the collector console's info/error/text("…") and the report texts'
+//     .t("…"), .args("…") and .count("…") in Rust.
 //  5. Every rule of rules/catalog.json has a title and a rationale.
 //  6. i18n/languages.json lists exactly the supported languages; en and de are
 //     the reviewed ones.
@@ -28,7 +29,11 @@ const PLURALS = { pl: ['few', 'many', 'one', 'other'] };
 const DEFAULT_PLURALS = ['one', 'other'];
 const PLURAL_SUFFIX = /^(.*)_(one|few|many|other)$/;
 // Keys built at runtime from enumeration values (checked by vbs-core's tests for completeness).
-const DYNAMIC_PREFIXES = ['kind.', 'activation.', 'reason.', 'limitation.', 'classification.', 'findingStatus.', 'rule.'];
+const DYNAMIC_PREFIXES = [
+  'kind.', 'activation.', 'reason.', 'limitation.', 'classification.', 'findingStatus.', 'rule.', 'hint.', 'risk.',
+  'origin.', 'source.', 'sourceStatus.', 'sourceReason.', 'setAside.', 'locationKind.', 'productType.', 'coverage.',
+  'edition.',
+];
 
 const errors = [];
 const warnings = [];
@@ -135,12 +140,13 @@ const PATTERNS = {
     /\bt(?:_args)?\(\s*[^,()]+?,\s*"([^"\\]+)"/g,
     /\bkey\(\s*"([^"\\]+)"\s*\)/g,
     /\bconsole\.(?:info|error|text)\(\s*"([^"\\]+)"/g,
+    /\.(?:t|args)\(\s*"([^"\\]+)"/g,
   ],
 };
 const PLURAL_PATTERNS = {
   '.ts': [/\btc\(\s*['"]([^'"\\]+)['"]/g],
   '.svelte': [/\btc\(\s*['"]([^'"\\]+)['"]/g],
-  '.rs': [/\bt_count\(\s*[^,()]+?,\s*"([^"\\]+)"/g],
+  '.rs': [/\bt_count\(\s*[^,()]+?,\s*"([^"\\]+)"/g, /\.count\(\s*"([^"\\]+)"/g],
 };
 
 function* walk(dir) {

@@ -5,8 +5,8 @@
 | 1/6 Fundament | ✅ abgeschlossen 2026-09-26 | Opus 5.5 (hoch) |
 | 2/6 Sammler: Systemebene | ✅ abgeschlossen 2026-09-26 | Opus 5.5 (hoch) |
 | 3/6 Sammler: Office-Makros | ✅ abgeschlossen 2026-09-26 | Opus 5.5 (hoch) |
-| 4/6 Auswertung und Berichte | ⏭ als Nächstes | Opus 5.5 (mittel) |
-| 5/6 Lizenzen, Übersetzungen, Pakete, Abnahme | offen | Sonnet 5 (mittel) |
+| 4/6 Auswertung und Berichte | ✅ abgeschlossen 2026-09-27 | Opus 5.5 (mittel) |
+| 5/6 Lizenzen, Übersetzungen, Pakete, Abnahme | ⏭ als Nächstes | Sonnet 5 (mittel) |
 | 6/6 Vermarktung | offen | Opus 5.5 (mittel) |
 
 **Nachweis Phase 1:** CI-Lauf 36253499363 grün. QK1: statische Nur-lesend-Prüfung mit Selbsttest, Snapshot-Test,
@@ -25,9 +25,9 @@ in < 1 s; Vollscan der Runner 1,44 Mio. (2025) / 1,82 Mio. Einträge (2022) ohne
 Windows erzeugten Artefakten (Aufgabe, Run-Wert, Dienst-Wrapper, WMI-Abo, Verknüpfung, msi.dll-Paket, Script Encoder,
 Profil eines nicht angemeldeten Benutzers) grün. Real gefundener Fehler behoben: lange MSI-Zeichenketten (SQL Server 2016).
 
-**Nachweis Phase 3:** CI-Lauf 36279662753 auf Linux, windows-2025 und windows-2022 vollständig grün (inkl. Systemtest
-mit Office-Teil, Vollscan der Runner und Prüfung auf Windows-eigene Daten; davor Lauf 36277624252 grün). Modul
-`office-macro` mit eigenen Lesern ohne Office: Verbunddateien (.xls/.xla/.xlt/.doc/.dot, eingebettete Objekte),
+**Nachweis Phase 3:** CI-Läufe 36279662753 und 36280760857 (Abschluss-Commit 7fbdb88) auf Linux, windows-2025 und
+windows-2022 vollständig grün (inkl. Systemtest mit Office-Teil, Vollscan der Runner und Prüfung auf Windows-eigene
+Daten). Modul `office-macro` mit eigenen Lesern ohne Office: Verbunddateien (.xls/.xla/.xlt/.doc/.dot, eingebettete Objekte),
 Open-XML-Pakete (.xlsm/.xlsb/.xlam/.xltm/.docm/.dotm/.pptm/.potm/.ppsm/.ppam, eingebettete Pakete), Access 2000–2016
 (.mdb/.accdb über MSysAccessStorage bzw. MSysAccessObjects, auch RC4-kodierte Jet-4-Datenbanken); MS-OVBA-Dekompression,
 dir/PROJECT-Stream, Schutzstatus. 7 neue Regeln (600, 601, 611, 612, 621, 622, 632), 5 neue datierte Quellen, Texte in 8
@@ -49,6 +49,19 @@ Docker-Schichten) und ESE-Datenbanken der Benutzerzugriffsprotokollierung. Jetzt
 Negativsammlung um solche Dateien ergänzt, der CI-Vollscan schlägt fehl, falls sie wieder als Befund auftauchen.
 Einziger Office-Befund der Runner außerhalb der Testsammlung: die gesperrte `Current.mdb` (siehe offene Punkte).
 
+**Nachweis Phase 4:** Auswertung in `vbs-evaluation`: neuester Scan je Rechner, Entdoppeln (gleiche Netzwerkdatei von
+mehreren Rechnern, gleicher Inhalt → Aufwand einmal), Verknüpfung Eintrag → gestartetes Skript, Risiko nach Vorgabe
+(automatisch > laut Protokoll > Office-Makro > ruhend; `breaks` vor `review`), Migrationshinweis und Faustwert je Regel
+im Katalog (`hint`, `effort` mit Basis fest/Skriptgröße/Eintrag). Windows-Bestandteile (WinSxS, Wartung, Docker-Schichten,
+`LogFiles\Sum\*.mdb` = gesperrte `Current.mdb`, gleicher Hash wie im Komponentenspeicher) getrennt als „Info“ ohne
+Aufwand – offener Punkt aus Phase 3 erledigt. Management-PDF (krilla, eingebettete Liberation Sans, „Seite X von Y“,
+Lesezeichen) und Excel-Liste (bis zu 7 Blätter) in 8 Sprachen; App mit Übersicht, Befundliste, Detail, Rechnern, Berichten.
+Abnahme: 1.000 Ergebnisdateien (210.410 Funde → 100.183 Einträge) in 3,1 s gelesen und zusammengeführt (Grenze 60 s,
+CI-Schritt Linux/Windows); Berichte in allen Sprachen vollständig – Rust-Tests und unabhängig per pdftotext/zipfile
+(`scripts/reports/check.py`, CI); jeder Aufwand als „Faustwert“ gekennzeichnet (PDF, Excel, App). Gratis-Edition in Rust
+durchgesetzt (≤ 25 Rechner bei Import und Auswertung, PDF verweigert, keine Hinweise/Aufwände in Ansichten und Excel);
+Organisationsname und MSP-Logo/Firmenname vorbereitet. Release-App: Linux-Smoke-Test inkl. Berichten grün.
+
 **Offene Punkte / Abweichungen**
 - QK4-Präzisierung: Ein nur „für die Anzeige gesperrtes“ VBA-Projekt wird gelesen (die Sperre verschlüsselt den
   Quelltext nicht) und mit `projectLocked` gemeldet – „not checkable“ nur, wenn der Code wirklich nicht lesbar ist.
@@ -64,8 +77,9 @@ Einziger Office-Befund der Runner außerhalb der Testsammlung: die gesperrte `Cu
 - QK3: Windows 10/11 und Server 2016/2019 nicht in CI (Rust-Ziel belegt „Windows 10+/Server 2016+“) → Lauf auf echten
   Maschinen bei der Abnahme (Phase 5).
 - Ereignis 4096 wurde auf keinem Runner protokolliert → Datenformat auf einem System verifizieren, das es schreibt.
-- Phase 4: Windows-eigene Skripte (System32, WinSxS, Docker-Image-Schichten) als „Windows-Bestandteil“ einordnen und
-  Duplikate zusammenfassen; Platzhalter in `docker\windowsfilter` erscheinen als `cloudPlaceholder` (eigener Grund?).
-  Die gesperrte `Current.mdb` der Benutzerzugriffsprotokollierung (Windows Server) bleibt „nicht prüfbar (gesperrt)“ –
-  der Sammler überspringt nichts nach Pfad; die Auswertung soll sie als Windows-Bestandteil kennzeichnen.
+- Phase 4: Die App läuft bis zu den Lizenzschlüsseln (Phase 5) immer als Gratis-Edition; Organisation/MSP nur in Tests
+  und `examples/report.rs --edition`. Aufwandswerte sind eigene Faustwerte ohne externe Quelle (so gekennzeichnet) →
+  mit Praxiswerten nachjustieren. Drittanbieter-Hinweise (Liberation Sans/OFL, Crates) für das Release zusammenstellen.
+  Berichte des Runner-Vollscans (CI-Artefakt `reports-out`) einmal fachlich durchsehen. fr/es/it/nl/pl/pt-BR maschinell
+  unterstützt (Korrekturhinweis in der App). „Manage the Component Store“ (Microsoft Learn) vor Release gegenlesen.
 - Optional: Walk unter Windows beschleunigen (Vollscan 6–12 min); PowerShell-Dateien > 16 MB sind `tooLarge`.

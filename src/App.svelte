@@ -1,7 +1,15 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { getCurrentWebview } from '@tauri-apps/api/webview';
-  import { api, type AppInfo, type EditionKind, type ImportSummary, type MachineSummary } from './lib/api';
+  import {
+    api,
+    type AppInfo,
+    type EditionKind,
+    type ImportSummary,
+    type MachineSummary,
+    type Overview as OverviewData,
+    type RiskLevel,
+  } from './lib/api';
   import {
     LANGUAGES,
     isLang,
@@ -11,26 +19,43 @@
     setLanguage,
     t,
     tc,
-    tDynamic,
     type MessageKey,
   } from './lib/i18n.svelte';
   import { product } from './lib/product';
   import Logo from './lib/Logo.svelte';
+  import Findings from './components/Findings.svelte';
+  import FindingsOverview from './components/Overview.svelte';
+  import Machines from './components/Machines.svelte';
+  import Reports from './components/Reports.svelte';
+
+  type Tab = 'overview' | 'findings' | 'machines' | 'reports';
 
   let info = $state<AppInfo | null>(null);
   let error = $state<string | null>(null);
   let languageChoice = $state('system');
   let reviewed = $state(true);
   let machines = $state<MachineSummary[]>([]);
+  let overview = $state<OverviewData | null>(null);
   let lastImport = $state<ImportSummary | null>(null);
   let busy = $state(false);
   let dropActive = $state(false);
+  let tab = $state<Tab>('overview');
+  let revision = $state(0);
+  let findingsRisk = $state<RiskLevel | null>(null);
+  let findingsOrigin = $state<'own' | 'windows' | 'all'>('own');
 
   const editionLabels: Record<EditionKind, MessageKey> = {
     free: key('edition.free'),
     organization: key('edition.organization'),
     msp: key('edition.msp'),
   };
+
+  const tabs: { id: Tab; label: MessageKey }[] = [
+    { id: 'overview', label: key('nav.overview') },
+    { id: 'findings', label: key('nav.findings') },
+    { id: 'machines', label: key('nav.machines') },
+    { id: 'reports', label: key('nav.reports') },
+  ];
 
   const errorKeys: Record<ImportSummary['errors'][number]['code'], MessageKey> = {
     notResultFile: key('import.error.notResultFile'),
@@ -41,12 +66,7 @@
     io: key('import.error.io'),
   };
 
-  const dateFormat = $derived(new Intl.DateTimeFormat(language(), { dateStyle: 'medium', timeStyle: 'short' }));
-
-  function formatDate(iso: string): string {
-    const date = new Date(iso);
-    return Number.isNaN(date.getTime()) ? iso : dateFormat.format(date);
-  }
+  const kinds = $derived(overview ? overview.byKind.map((row) => row.kind) : []);
 
   function importError(entry: ImportSummary['errors'][number]): string {
     return t(errorKeys[entry.code], {
@@ -57,6 +77,11 @@
     });
   }
 
+  async function refresh() {
+    overview = await api.overview();
+    revision += 1;
+  }
+
   async function runImport(action: () => Promise<ImportSummary>) {
     busy = true;
     error = null;
@@ -64,6 +89,7 @@
       const summary = await action();
       machines = summary.machines;
       if (!summary.cancelled) lastImport = summary;
+      await refresh();
     } catch (e) {
       error = String(e);
     } finally {
@@ -75,6 +101,15 @@
     await api.clearResults().catch((e) => (error = String(e)));
     machines = [];
     lastImport = null;
+    overview = null;
+    tab = 'overview';
+    revision += 1;
+  }
+
+  function showFindings(risk: RiskLevel | null, origin: 'own' | 'windows') {
+    findingsRisk = risk;
+    findingsOrigin = origin;
+    tab = 'findings';
   }
 
   onMount(() => {
@@ -86,6 +121,7 @@
         reviewed = info.language.reviewed;
         languageChoice = info.uiLanguageSetting ?? 'system';
         machines = await api.loadedMachines();
+        if (machines.length) await refresh();
         unlisten = await getCurrentWebview().onDragDropEvent((event) => {
           if (event.payload.type === 'enter' || event.payload.type === 'over') {
             dropActive = true;
@@ -117,6 +153,17 @@
       error = String(e);
     }
   }
+
+  function tabKey(event: KeyboardEvent, index: number) {
+    const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+    if (!step) return;
+    event.preventDefault();
+    const next = tabs[(index + step + tabs.length) % tabs.length];
+    if (next) {
+      tab = next.id;
+      document.getElementById(`tab-${next.id}`)?.focus();
+    }
+  }
 </script>
 
 <div class="shell" class:drop-active={dropActive}>
@@ -126,6 +173,9 @@
       <span class="brand-name">{product.name}</span>
       {#if info}
         <span class="badge" data-kind={info.edition.kind}>{t(editionLabels[info.edition.kind])}</span>
+        {#if info.edition.licensee}
+          <span class="licensee">{t('edition.licensedTo', { name: info.edition.licensee })}</span>
+        {/if}
       {/if}
     </div>
     <label class="language">
@@ -144,33 +194,47 @@
   {/if}
 
   <main class="content">
-    <section class="hero" aria-labelledby="hero-title">
-      <h1 id="hero-title">{product.name}</h1>
-      <p class="tagline">{t('app.tagline')}</p>
-      <p class="intro">{t('home.intro')}</p>
-      <div class="actions">
-        <button type="button" class="primary" disabled={busy} onclick={() => runImport(api.openResultFiles)}>
-          {t('home.openFiles')}
-        </button>
-        <button type="button" disabled={busy} onclick={() => runImport(api.openResultFolder)}>
-          {t('home.openFolder')}
-        </button>
-        {#if machines.length}
+    {#if machines.length === 0}
+      <section class="hero" aria-labelledby="hero-title">
+        <h1 id="hero-title">{product.name}</h1>
+        <p class="tagline">{t('app.tagline')}</p>
+        <p class="intro">{t('home.intro')}</p>
+        <div class="actions">
+          <button type="button" class="primary" disabled={busy} onclick={() => runImport(api.openResultFiles)}>
+            {t('home.openFiles')}
+          </button>
+          <button type="button" disabled={busy} onclick={() => runImport(api.openResultFolder)}>
+            {t('home.openFolder')}
+          </button>
+        </div>
+        <p class="hint">{busy ? t('import.reading') : t('home.dropHint')}</p>
+      </section>
+    {:else}
+      <section class="toolbar" aria-label={t('home.loaded')}>
+        <strong>{tc('machine.count', machines.length)}</strong>
+        <div class="actions">
+          <button type="button" disabled={busy} onclick={() => runImport(api.openResultFiles)}>{t('home.openFiles')}</button>
+          <button type="button" disabled={busy} onclick={() => runImport(api.openResultFolder)}>
+            {t('home.openFolder')}
+          </button>
           <button type="button" class="quiet" disabled={busy} onclick={clearAll}>{t('home.clear')}</button>
-        {/if}
-      </div>
-      <p class="hint">{busy ? t('import.reading') : t('home.dropHint')}</p>
-    </section>
+        </div>
+        <span class="hint">{busy ? t('import.reading') : t('home.dropHint')}</span>
+      </section>
+    {/if}
 
     {#if error}
       <p class="error" role="alert">{t('error.generic', { message: error })}</p>
     {/if}
 
     {#if lastImport}
-      <section class="import-status" aria-live="polite">
+      <section class="panel import-status" aria-live="polite">
         <p>{tc('import.loaded', lastImport.loaded)}</p>
         {#if lastImport.duplicates}
           <p>{tc('import.duplicates', lastImport.duplicates)}</p>
+        {/if}
+        {#if lastImport.overLimit}
+          <p class="failed">{tc('import.overLimit', lastImport.overLimit, { max: lastImport.machineLimit ?? 0 })}</p>
         {/if}
         {#if lastImport.newerValues}
           <p>{t('import.newerValues')}</p>
@@ -186,55 +250,44 @@
       </section>
     {/if}
 
-    {#if machines.length}
-      <section class="machines" aria-labelledby="machines-title">
-        <h2 id="machines-title">{t('machines.heading')} · {tc('machine.count', machines.length)}</h2>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">{t('machines.column.machine')}</th>
-                <th scope="col">{t('machines.column.os')}</th>
-                <th scope="col">{t('machines.column.scanned')}</th>
-                <th scope="col">{t('machines.column.coverage')}</th>
-                <th scope="col" class="number">{t('machines.column.findings')}</th>
-                <th scope="col">{t('machines.column.file')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each machines as machine (machine.scanId)}
-                <tr>
-                  <th scope="row">
-                    {machine.hostname}
-                    {#if machine.domain}<span class="muted">.{machine.domain}</span>{/if}
-                  </th>
-                  <td>{machine.os ?? '–'}</td>
-                  <td>{formatDate(machine.scannedAt)}</td>
-                  <td>
-                    <span class="coverage" data-mode={machine.coverage}>
-                      {machine.coverage === 'full' ? t('coverage.full') : t('coverage.limited')}
-                    </span>
-                    {#each machine.limitations as code (code)}
-                      <span class="limitation">{tDynamic(`limitation.${code}`, code)}</span>
-                    {/each}
-                  </td>
-                  <td class="number">
-                    {machine.findings}
-                    {#if machine.notCheckable}
-                      <span class="muted">+ {machine.notCheckable} {t('findingStatus.notCheckable')}</span>
-                    {/if}
-                  </td>
-                  <td class="file" title={machine.path}>{machine.fileName}</td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
-        </div>
-      </section>
+    {#if machines.length && overview && info}
+      <div class="tabs" role="tablist" aria-label={t('nav.label')}>
+        {#each tabs as item, index (item.id)}
+          <button
+            type="button"
+            role="tab"
+            id={`tab-${item.id}`}
+            aria-selected={tab === item.id}
+            aria-controls={`panel-${item.id}`}
+            tabindex={tab === item.id ? 0 : -1}
+            onclick={() => (tab = item.id)}
+            onkeydown={(event) => tabKey(event, index)}
+          >
+            {t(item.label)}
+          </button>
+        {/each}
+      </div>
+      <div class="tab-panel" role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
+        {#if tab === 'overview'}
+          <FindingsOverview {overview} edition={info.edition} onshow={showFindings} />
+        {:else if tab === 'findings'}
+          <Findings
+            edition={info.edition}
+            {kinds}
+            {revision}
+            bind:risk={findingsRisk}
+            bind:origin={findingsOrigin}
+          />
+        {:else if tab === 'machines'}
+          <Machines {machines} />
+        {:else}
+          <Reports edition={info.edition} />
+        {/if}
+      </div>
     {/if}
 
     {#if info && info.edition.kind === 'free' && info.edition.maxMachines !== null}
-      <section class="edition" aria-label={t('about.edition')}>
+      <section class="panel edition" aria-label={t('about.edition')}>
         <p>
           <strong>{t('edition.free')}</strong> · {t('edition.freeLimit', { max: info.edition.maxMachines })}
         </p>
@@ -296,6 +349,11 @@
     color: var(--badge-text);
   }
 
+  .licensee {
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
   .language {
     display: flex;
     align-items: center;
@@ -322,12 +380,12 @@
   }
 
   .content {
-    width: min(1100px, 100% - 3rem);
+    width: min(1280px, 100% - 3rem);
     margin: 0 auto;
-    padding: 2.5rem 0 2rem;
+    padding: 2rem 0;
     display: flex;
     flex-direction: column;
-    gap: 1.75rem;
+    gap: 1.25rem;
   }
 
   h1 {
@@ -347,58 +405,15 @@
     max-width: 60ch;
   }
 
-  .actions {
+  .toolbar {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.75rem;
+    align-items: center;
+    gap: 0.75rem 1.25rem;
   }
 
-  button {
-    padding: 0.65rem 1.2rem;
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text);
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  button.primary {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: var(--accent-text);
-  }
-
-  button.quiet {
-    background: transparent;
-  }
-
-  button:disabled {
-    cursor: not-allowed;
-    opacity: 0.55;
-  }
-
-  .hint {
-    margin: 0.75rem 0 0;
-    color: var(--muted);
-    font-size: 0.9rem;
-  }
-
-  .error {
+  .toolbar .hint {
     margin: 0;
-    padding: 0.75rem 1rem;
-    border-radius: var(--radius);
-    background: var(--error-bg);
-    color: var(--error-text);
-  }
-
-  .import-status,
-  .machines,
-  .edition {
-    padding: 1.25rem 1.5rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
   }
 
   .import-status p,
@@ -422,76 +437,31 @@
     overflow-wrap: anywhere;
   }
 
-  h2 {
-    margin: 0 0 0.75rem;
-    font-size: 1.05rem;
-  }
-
-  .table-wrap {
-    overflow-x: auto;
-  }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.92rem;
-  }
-
-  th,
-  td {
-    padding: 0.5rem 0.6rem;
+  .tabs {
+    display: flex;
+    gap: 0.25rem;
     border-bottom: 1px solid var(--border);
-    text-align: left;
-    vertical-align: top;
   }
 
-  thead th {
+  .tabs button {
+    padding: 0.55rem 1rem;
+    border: none;
+    border-bottom: 3px solid transparent;
+    border-radius: 0;
+    background: transparent;
     color: var(--muted);
     font-weight: 600;
-    white-space: nowrap;
   }
 
-  tbody th {
-    font-weight: 600;
+  .tabs button[aria-selected='true'] {
+    border-bottom-color: var(--accent);
+    color: var(--text);
   }
 
-  .number {
-    text-align: right;
-    white-space: nowrap;
-  }
-
-  td.file {
-    max-width: 16rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .muted {
-    color: var(--muted);
-    font-weight: 400;
-  }
-
-  .coverage {
-    display: inline-block;
-    padding: 0 0.45rem;
-    border-radius: 999px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    background: var(--badge-bg);
-    color: var(--badge-text);
-  }
-
-  .coverage[data-mode='limited'] {
-    background: var(--error-bg);
-    color: var(--error-text);
-  }
-
-  .limitation {
-    display: block;
-    margin-top: 0.2rem;
-    color: var(--muted);
-    font-size: 0.82rem;
+  .tab-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
   }
 
   .footer {

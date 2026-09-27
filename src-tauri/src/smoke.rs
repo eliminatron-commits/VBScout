@@ -1,13 +1,13 @@
 //! `--smoke-test[=<seconds>]`: starts the app normally, waits until the
 //! frontend reports ready, runs an offline self-check (a result file is
 //! written to a temporary folder, imported through the same path as the UI
-//! uses and checked; all catalogs are exercised) and exits with code 0.
+//! uses and checked; the assessment is built and both reports are rendered in
+//! memory in every language; all catalogs are exercised) and exits with code 0.
 //!
 //! CI uses it to prove that the app starts, and as the workload of the network
 //! block test (`scripts/nettest/`). Exit codes: 2 = frontend not ready in time,
 //! 3 = self-check failed.
 
-use std::collections::HashSet;
 use std::time::Duration;
 
 use tauri::AppHandle;
@@ -124,7 +124,13 @@ fn self_check() -> Result<usize, String> {
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let path = dir.join(format!("smoke.{}", vbs_core::file_extension()));
     let written = vbs_core::to_bytes(&sample()).and_then(|bytes| Ok(std::fs::write(&path, bytes)?));
-    let batch = written.map(|()| vbs_evaluation::import::import(std::slice::from_ref(&dir), &HashSet::new()));
+    let batch = written.map(|()| {
+        vbs_evaluation::import::import(
+            std::slice::from_ref(&dir),
+            &vbs_evaluation::import::LoadedState::default(),
+            None,
+        )
+    });
     let _ = std::fs::remove_dir_all(&dir);
     let batch = batch.map_err(|e| e.to_string())?;
 
@@ -144,7 +150,42 @@ fn self_check() -> Result<usize, String> {
             return Err(format!("catalog {lang} is incomplete"));
         }
     }
+    reports(&batch.files)?;
     Ok(result.findings.len())
+}
+
+/// Builds the assessment and renders both reports in memory, in every language: the Excel list
+/// as the free edition gets it, the PDF as a licensed edition would (the free edition is refused).
+fn reports(files: &[vbs_evaluation::import::ImportedFile]) -> Result<(), String> {
+    use vbs_evaluation::assessment::Assessment;
+    use vbs_evaluation::edition::Edition;
+    use vbs_evaluation::report::{Branding, ReportContext, ReportError, pdf, xlsx};
+
+    let assessment = Assessment::build(files, None);
+    if assessment.items.len() != 1 {
+        return Err(format!("expected one item in the assessment, got {}", assessment.items.len()));
+    }
+    let free = Edition::free();
+    let licensed = Edition::Organization { name: "Smoke test".into() };
+    let branding = Branding::default();
+    for lang in Lang::ALL {
+        let context = |edition| ReportContext {
+            lang,
+            edition,
+            branding: &branding,
+            created: OffsetDateTime::now_utc(),
+            version: env!("CARGO_PKG_VERSION"),
+        };
+        let excel = xlsx::write(&assessment, &context(&free)).map_err(|e| e.to_string())?;
+        let pdf = pdf::write(&assessment, &context(&licensed)).map_err(|e| e.to_string())?;
+        if !excel.starts_with(b"PK") || !pdf.starts_with(b"%PDF-") {
+            return Err(format!("{lang}: a report is not an .xlsx or PDF file"));
+        }
+        if !matches!(pdf::write(&assessment, &context(&free)), Err(ReportError::NotLicensed)) {
+            return Err("the free edition must not create the PDF report".into());
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

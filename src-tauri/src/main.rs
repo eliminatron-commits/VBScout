@@ -8,6 +8,7 @@ mod settings;
 mod smoke;
 mod state;
 mod summary;
+mod views;
 
 use tauri::Manager;
 
@@ -22,11 +23,19 @@ fn main() {
             commands::import_paths,
             commands::loaded_machines,
             commands::clear_results,
+            commands::overview,
+            commands::findings,
+            commands::finding,
+            commands::report_settings,
+            commands::set_report_customer,
+            commands::choose_report_logo,
+            commands::clear_report_logo,
+            commands::export_excel,
+            commands::export_pdf,
             commands::frontend_ready,
         ])
         .setup(move |app| {
-            let settings_path = app.path().app_config_dir()?.join("settings.json");
-            app.manage(state::AppState::new(settings_path, smoke));
+            app.manage(state::AppState::new(app.path().app_config_dir()?, smoke));
             smoke.arm_watchdog();
             Ok(())
         })

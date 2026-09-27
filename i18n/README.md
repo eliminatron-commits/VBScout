@@ -30,7 +30,12 @@ link to this folder whenever an unreviewed language is selected.
    `_one`, `_few`, `_many` and `_other`; all other languages `_one` and `_other`.
 6. `collector.help` is the console help text: keep the option names (`--out`, `--path`, …) and the layout (lines of
    at most 80 characters).
-7. Run `npm run check:i18n` before opening a pull request. It checks that all keys exist, placeholders match, plural
+7. Report texts (`report.*`, `hint.*`, `effort.*`): effort figures are rules of thumb – keep that wording
+   ("Faustwert", "estimation indicative", …) and never promise completeness in the coverage texts. Excel sheet names
+   (`report.sheet.*`) may have at most 31 characters and none of `[ ] : * ? / \`.
+8. `format.number` is the number 1234.5 written the way your language writes it (e.g. `1.234,5`; French uses a
+   narrow no-break space ` `); `format.date` is the date pattern with `{year}`, `{month}` and `{day}`.
+9. Run `npm run check:i18n` before opening a pull request. It checks that all keys exist, placeholders match, plural
    forms are complete, and no message is empty.
 
 When a native speaker has reviewed a whole catalog, set `"reviewed": true` for that language in `languages.json`.

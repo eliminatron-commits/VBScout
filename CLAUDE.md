@@ -13,7 +13,7 @@ Two programs:
   Server 2016–2025), distributed by the customer via Intune/GPO/RMM, run per machine. **Strictly read-only**; writes
   exactly one `.vbscout` result file.
 * **Evaluation** (`vbs-app`, Tauri 2): merges any number of result files, de-duplicates, rates risk, adds migration
-  hints and rule-of-thumb effort, and produces the management PDF and the technical Excel list (phase 4).
+  hints and rule-of-thumb effort, and produces the management PDF and the technical Excel list.
 
 ## Commands
 
@@ -30,6 +30,9 @@ Two programs:
 | Read-only trace | Linux: `bash scripts/readonly/linux.sh <collector> <folder>` · Windows (elevated pwsh): `scripts/readonly/windows.ps1 -Exe <exe> -ScanPath <folder>` |
 | Network block test | Linux: `bash scripts/nettest/linux.sh [--gui] <out> -- <program> [args…]` · Windows (elevated pwsh): `scripts/nettest/windows.ps1 -Exe <exe> -Arguments … [-WebView]` |
 | Scan performance (DoD #5) | `cargo test --release -p vbs-collector --test performance -- --ignored --nocapture` (100,000 files < 10 min) |
+| Merge performance (DoD #5) | `cargo test --release -p vbs-evaluation --test merge_performance -- --ignored --nocapture` (1,000 result files < 1 min) |
+| Reports without the app | `cargo run -p vbs-evaluation --example report -- --out <folder> [--lang de] [--sample 30] [--edition free\|organization:<name>\|msp:<company>] [--customer <name>] [--logo <png>] [--list] [result files or folders…]` |
+| Check reports with other tools | `python3 scripts/reports/check.py <folder> [--free <folder>]` – PDF text via pdftotext (poppler), Excel via the Python standard library |
 | System test with real Windows artefacts | elevated pwsh on a disposable machine: `scripts/systemtest/windows.ps1 -Exe <exe>`; limited scan without admin rights: `scripts/systemtest/nonadmin.ps1 -Exe <exe> -ScanPath <folder>` |
 | Test collection | `cargo test -p vbs-collector --test corpus`; print what `positive/` yields: `… -- --ignored --nocapture print_positive_cases`; binary fixtures: `python3 tests/corpus/make-binaries.py` (needs msitools, hivex, pylnk3, olefile; for Office files Java 17+, mdbtools, oletools, msoffcrypto-tool – `tests/corpus/office_fixtures.py`) |
 | Office readers vs. real files | `cargo test -p vbs-collector --test office_formats`; compare a folder of documents: `VBS_OFFICE_SAMPLES=<folder> cargo test -p vbs-collector --test office_formats -- --ignored --nocapture` |
@@ -42,11 +45,13 @@ The toolchain is pinned in `rust-toolchain.toml` (same as Stepwright). Building 
 WebKitGTK 4.1 (`libwebkit2gtk-4.1-dev`); the product itself targets Windows x64 only.
 
 CI (`.github/workflows/ci.yml`): checks (ubuntu) → Linux job (fmt, clippy, tests, Cargo-graph offline check,
-performance test, strace read-only trace and network test of the collector) and Windows jobs on windows-2025 and
-windows-2022 (clippy, tests, release build with static CRT, size and import check, performance test, ETW read-only trace,
-network block test, non-admin run, system test with artefacts made by Windows, full scan of the runner without
-internal errors and without findings for Windows servicing data or ESE databases; app build, smoke and network tests on
-2025). Logs and results are uploaded as artifacts.
+scan and merge performance tests, strace read-only trace and network test of the collector, reports in eight languages
+from the corpus scan and sample machines, read back with pdftotext and the Python standard library) and Windows jobs
+on windows-2025 and windows-2022 (clippy, tests, release build with static CRT, size and import check, scan and merge
+performance tests, ETW read-only trace, network block test, non-admin run, system test with artefacts made by Windows,
+full scan of the runner without internal errors and without findings for Windows servicing data or ESE databases,
+reports of that full scan; app build, smoke test – which renders both reports in every language – and network tests
+on 2025). Logs, results and reports are uploaded as artifacts.
 
 ## Layout
 
@@ -65,13 +70,18 @@ crates/
                         event XML, registry hive files, VBA projects, Office documents, Access databases,
                         Windows servicing data),
                         modules/ (one file per finding type)
-  vbs-evaluation/       evaluation logic without UI: import (phase 1); merge, de-dup, risk, effort, reports (phase 4)
+  vbs-evaluation/       evaluation logic without UI: import (machine limit), assessment (newest scan per machine,
+                        de-duplication, Windows components, entry→script links, risk), effort (rules of thumb),
+                        coverage, edition (limits enforced here), report/ (pdf with a small layout engine,
+                        xlsx, text formatting), sample (synthetic results); assets/fonts (Liberation Sans, OFL)
   vbs-license/          license interface (offline only; Ed25519 format + org/MSP keys in phase 5)
 src-tauri/              Tauri shell (crate vbs-app): commands, smoke test, settings, tauri.conf.json, capabilities, icons
-src/                    Svelte 5 + TypeScript frontend (view only; talks to Rust via IPC)
+src/                    Svelte 5 + TypeScript frontend (view only; talks to Rust via IPC): App.svelte (shell, import,
+                        tabs), components/ (overview, findings with detail, machines, reports)
 tests/corpus/           positive/ and negative/ collections incl. system/ and office/ fixtures + expected.json (DoD #4),
                         make-binaries.py, office_fixtures.py + tools/OfficeFixtures.java, THIRD-PARTY.md (real Office files)
-scripts/                sync-config, check-i18n/offline/readonly/size (Node, no deps); nettest/, readonly/, systemtest/ (dynamic)
+scripts/                sync-config, check-i18n/offline/readonly/size (Node, no deps); nettest/, readonly/, systemtest/ (dynamic);
+                        reports/check.py (reads the reports with pdftotext and the Python standard library)
 docs/                   result-format.md, result.schema.json, examples/, research-notes.md (sources with dates)
 ```
 
@@ -99,8 +109,13 @@ Later phases add: `worker/` + `tools/` license keys (5), `packaging/` winget + i
   (`tasks.scheduled`, `autostart.entries`, `services.configuration`, `wmi.subscriptions`, `policies.scripts`,
   `installer.packages`, `eventLog.vbscriptDeprecation`, `eventLog.sysmon`; list in `docs/result-format.md`).
 - i18n keys: flat, dot-separated camelCase; plurals `_one/_few/_many/_other`; keys outside `t()` calls wrapped in
-  `key("…")`; dynamic keys only with the prefixes `kind.`, `activation.`, `reason.`, `limitation.`, `classification.`,
-  `findingStatus.`, `rule.` (their completeness is tested in `vbs-core`).
+  `key("…")` (the report code's `text.t/args/count("…")` is recognised too); dynamic keys only with the prefixes
+  `kind.`, `activation.`, `reason.`, `limitation.`, `classification.`, `findingStatus.`, `rule.`, `hint.`, `risk.`,
+  `origin.`, `source.`, `sourceStatus.`, `sourceReason.`, `setAside.`, `locationKind.`, `productType.`, `coverage.`,
+  `edition.` (completeness tested in `vbs-core` and `vbs-evaluation`). `format.number` (1234.5 written in the
+  language) and `format.date` (`{year}`, `{month}`, `{day}`) set number and date formats of the reports.
+- Rule catalog entries carry `effort` (`minHours`, `maxHours`, `basis`: `fixed`, `scriptSize` or `entry`) and `hint`
+  (the text `hint.<id>`, shared by rules that are migrated the same way).
 - Commits: one per phase, `Phase X: <Name>`.
 
 ## Design decisions
@@ -162,13 +177,31 @@ Later phases add: `worker/` + `tools/` license keys (5), `packaging/` winget + i
 9. **Editions**: collector always free. Evaluation free = finding list, ≤ `editions.free.maxMachines` machines, no
    PDF, no migration hints, no effort; organization license (one-time, org name in reports, unlimited machines);
    MSP license (yearly, expiry against the system clock, unlimited customer environments, own logo and company name).
-   Keys are verified offline only (Ed25519, phase 5).
+   Keys are verified offline only (Ed25519, phase 5). Enforced in Rust (`vbs_evaluation::edition`): at import (files
+   of further machines are not loaded), in the views sent to the UI (no hint keys, no effort values) and in the report
+   writers (PDF refused; Excel without hint and effort columns). The customer/environment name is a setting in every
+   edition; the logo is stored as a setting but only printed with an MSP license.
 10. **i18n** (from Stepwright): one set of catalogs for Rust and UI, 8 languages; en and de reviewed, the others marked
    with a correction hint; completeness, placeholders, plurals and used keys checked in CI.
 11. **Offline guarantee** (from Stepwright): static (`check-offline.mjs`: IPC-only CSP, capabilities, deny lists,
     sources, WebView2 switches, collector graph without tokio/sockets; `clippy.toml` bans `std::net` and
     `Command::new`) and dynamic (`scripts/nettest/`: blocks and logs every connection attempt with a positive
     control, for the collector and the app).
+12. **Evaluation** (`crates/vbs-evaluation`): the newest scan per machine (host name + DNS domain + machine ID) is
+    evaluated; older scans and machines beyond the edition's limit are listed as set aside. Findings are merged into
+    items: the same network file (normalised path), the same entry or the same file content at the same path on
+    several machines, Windows' own files by name. **Windows components** = files in the component store, servicing
+    and update caches, User Access Logging databases, Windows folders of container image layers, or files with the same
+    content as a component-store file – never recognised by file name alone; listed separately (risk "info", no
+    effort). Entries (tasks, autostart, services, WMI, policies, shortcuts, calling scripts, macros, log records) link
+    to the scripts they start (exact path, or a file name that is unique on that machine); a script inherits the
+    activation of what starts it. **Risk**: `breaks` + automatic/logged = high; `breaks` + macro/manual/installer or
+    `review` + automatic/logged = medium; everything else low. **Effort**: rule-of-thumb ranges from the catalog –
+    `scriptSize` × 1/2/4/8 (≤ 8/32/128 KiB/larger), `entry` plus a typical script once per script the scan did not
+    find – counted once per item (central rollout assumed) and once per identical content; always labelled as a rule
+    of thumb. **Reports**: PDF with krilla and the embedded Liberation Sans (OFL, subset; text measured with rustybuzz),
+    Excel with rust_xlsxwriter, both in memory; every text from the catalogs; coverage shown without a completeness
+    promise.
 
 ## Forbidden approaches
 
@@ -187,6 +220,8 @@ Later phases add: `worker/` + `tools/` license keys (5), `packaging/` winget + i
 - **Silent skipping**: every candidate that cannot be analysed (protected, encrypted, locked, corrupt, too large,
   cloud placeholder, module failure) becomes a "not checkable" finding; every unreadable source shows in coverage.
 - Storing secrets in results, reports or logs; evidence beyond short excerpts of affected lines.
+- Effort figures without the rule-of-thumb label; dropping items from the evaluation (Windows components, older
+  scans and machines beyond the limit are listed separately, never hidden).
 - Agents, services, scheduled re-runs or continuous monitoring; cloud upload; tracking on the website.
 - Calling the project "Open Source" – it is **source-available** (FSL-1.1-ALv2).
 - Hard-coding product name, prices, URLs, limits or the result file type outside `product.json`.

@@ -7,6 +7,11 @@ export type EditionKind = 'free' | 'organization' | 'msp';
 export interface EditionInfo {
   kind: EditionKind;
   maxMachines: number | null;
+  licensee: string | null;
+  pdf: boolean;
+  hints: boolean;
+  effort: boolean;
+  logo: boolean;
 }
 
 export interface LanguageInfo {
@@ -52,9 +57,143 @@ export interface ImportSummary {
   cancelled: boolean;
   loaded: number;
   duplicates: number;
+  overLimit: number;
+  machineLimit: number | null;
   errors: ImportErrorView[];
   newerValues: boolean;
   machines: MachineSummary[];
+}
+
+export type RiskLevel = 'high' | 'medium' | 'low' | 'info';
+
+/** Rule-of-thumb range in hours. */
+export interface Range {
+  min: number;
+  max: number;
+}
+
+export interface KindRow {
+  kind: string;
+  items: number;
+  high: number;
+  medium: number;
+  low: number;
+  notCheckable: number;
+  machines: number;
+  effort: Range | null;
+}
+
+export interface LogSpanView {
+  read: number;
+  reported: number;
+  minDays: number | null;
+  maxDays: number | null;
+  earliest: string | null;
+}
+
+export interface CoverageView {
+  full: number;
+  limited: number;
+  limitations: [string, number][];
+  deprecation: LogSpanView;
+  sysmon: LogSpanView;
+  fileEntries: number;
+  fileErrors: number;
+  fileSkipped: number;
+  notCheckable: [string, number][];
+}
+
+export interface SetAsideView {
+  file: string;
+  hostname: string;
+  scannedAt: string;
+  why: 'superseded' | 'machineLimit' | string;
+}
+
+export interface Overview {
+  machines: number;
+  items: number;
+  high: number;
+  medium: number;
+  low: number;
+  notCheckable: number;
+  credentials: number;
+  windowsItems: number;
+  windowsOccurrences: number;
+  effort: Range | null;
+  byKind: KindRow[];
+  coverage: CoverageView;
+  setAside: SetAsideView[];
+}
+
+export interface FindingQuery {
+  risk?: string | null;
+  kind?: string | null;
+  origin?: 'own' | 'windows' | 'all';
+  search?: string | null;
+  offset: number;
+  limit: number;
+}
+
+export interface FindingRow {
+  number: number;
+  risk: RiskLevel;
+  classification: string;
+  status: 'detected' | 'notCheckable' | string;
+  reason: string | null;
+  rule: string;
+  kind: string;
+  activation: string;
+  origin: 'own' | 'windows';
+  machines: number;
+  machine: string;
+  location: string;
+  item: string | null;
+  target: string | null;
+  effort: Range | null;
+}
+
+export interface FindingsPage {
+  total: number;
+  offset: number;
+  rows: FindingRow[];
+}
+
+export interface EffortNote {
+  sameAs: number | null;
+  windows: boolean;
+  sizeFactor: number;
+  typicalScript: boolean;
+  countedOnce: boolean;
+}
+
+export interface FindingDetail extends FindingRow {
+  reportedActivation: string;
+  evidence: { line: number | null; text: string; masked: boolean }[];
+  occurrences: {
+    machine: string;
+    locationKind: string;
+    path: string;
+    item: string | null;
+    target: string | null;
+    activation: string;
+  }[];
+  moreOccurrences: number;
+  startedBy: number[];
+  starts: number[];
+  sameContentAs: number | null;
+  fileSize: number | null;
+  sha256: string | null;
+  details: Record<string, string>;
+  /** Translation key of the migration hint; null in the free edition. */
+  hint: string | null;
+  effortNote: EffortNote | null;
+  sources: { publisher: string; title: string; url: string; checked: string }[];
+}
+
+export interface ReportSettings {
+  customer: string | null;
+  logo: { dataUrl: string; width: number; height: number } | null;
 }
 
 export const api = {
@@ -65,5 +204,14 @@ export const api = {
   importPaths: (paths: string[]) => invoke<ImportSummary>('import_paths', { paths }),
   loadedMachines: () => invoke<MachineSummary[]>('loaded_machines'),
   clearResults: () => invoke<void>('clear_results'),
+  overview: () => invoke<Overview | null>('overview'),
+  findings: (query: FindingQuery) => invoke<FindingsPage>('findings', { query }),
+  finding: (number: number) => invoke<FindingDetail | null>('finding', { number }),
+  reportSettings: () => invoke<ReportSettings>('report_settings'),
+  setReportCustomer: (customer: string | null) => invoke<ReportSettings>('set_report_customer', { customer }),
+  chooseReportLogo: () => invoke<ReportSettings>('choose_report_logo'),
+  clearReportLogo: () => invoke<ReportSettings>('clear_report_logo'),
+  exportExcel: (language: string | null) => invoke<string | null>('export_excel', { language }),
+  exportPdf: (language: string | null) => invoke<string | null>('export_pdf', { language }),
   frontendReady: () => invoke<void>('frontend_ready'),
 };
