@@ -67,7 +67,11 @@ windows-2025 als Organisation ausgewertet: 195 eigene Einträge (hoch 6, mittel 
 16 Windows-Bestandteile (86 Fundorte); Einstufung durchgesehen – hoch sind nur Fixtures der Testsammlung unter
 Autostart-/Anmeldeskript-Pfaden, deaktivierte Aufgaben (Server Manager `CleanupOldPerfLogs`) ruhend, keine Fehleinstufung.
 
-**Nachweis Phase 5:** Lizenzformat `VBS1-<payload>.<signature>` (Ed25519, offline, Produktcode `vbs`, Neuentwurf –
+**Nachweis Phase 5:** CI-Lauf 36315645360 (5f095c8) auf Linux, windows-2025 und windows-2022 vollständig grün (inkl.
+Worker-Tests, Fixture-Abgleich JS↔Rust, NSIS-Build, Paketierung, stille Installation → Start → Deinstallation);
+Release-Probelauf 36315704184 (`release.yml`, sauberer Checkout) grün: Sammler 2,72 MB (8 Windows-Systembibliotheken),
+Setup 4,0 MB, portable App 15,2 MB, SHA256SUMS, winget-Manifeste, Drittanbieter-Hinweise (664 KB), Smoke-Test der
+paketierten App grün. Lizenzformat `VBS1-<payload>.<signature>` (Ed25519, offline, Produktcode `vbs`, Neuentwurf –
 Stepwright hatte keins; `docs/licensing.md`); App: Seite „Lizenz“ (aktivieren, entfernen, Ablauf, Schlüssel-ID), Schlüssel
 bei jedem Start neu geprüft, Edition/Maschinengrenze sofort angewendet; Texte in 8 Sprachen (525 Schlüssel).
 Schlüsseldienst `worker/` (Cloudflare Worker, Paddle-Sandbox): Webhook-Signatur, ein Schlüssel je Transaktion,
@@ -84,11 +88,11 @@ FSL-1.1-ALv2-Text), PRIVACY.md.
 |---|---|---|
 | 1 | Sammler verändert nichts, schreibt nur die Ergebnisdatei | statische Prüfung mit Selbsttest, Snapshot-Test, strace-/ETW-Kerneltrace mit Positivkontrolle (CI Linux/Windows) – 0 Änderungen |
 | 2 | null Netzwerkverbindungen (Sammler, Auswertung) | Offline-Prüfung (CSP, Rechte, Abhängigkeitsgraph, Quellen, Installer ohne WebView2-Download) + Blockadetest mit Positivkontrolle für Sammler und App inkl. WebView2 (CI) – 0 Verbindungen; Lizenz wird offline geprüft |
-| 3 | < 10 MB, ohne Installation, Win 10/11, Server 2016–2025; ohne Admin eingeschränkt mit Hinweis | Größen- und Importprüfung (nur Windows-Systembibliotheken, statische CRT), Läufe auf Server 2022/2025 inkl. Nicht-Admin-Lauf (CI); Win 10/11 und Server 2016/2019 → offener Punkt |
+| 3 | < 10 MB, ohne Installation, Win 10/11, Server 2016–2025; ohne Admin eingeschränkt mit Hinweis | Größen- und Importprüfung (2,72 MB, nur Windows-Systembibliotheken, statische CRT), Läufe auf Server 2022/2025 inkl. Nicht-Admin-Lauf (CI); Win 10/11 und Server 2016/2019 → offener Punkt |
 | 4 | Positiv 100 %, Negativ 0 Fehlalarme, geschützte Makros „not checkable“ | Korpus-Tests (103 erwartete Befunde, Negativsammlung 0) in CI |
 | 5 | 100.000 Dateien < 10 min; 1.000 Ergebnisdateien < 1 min | Leistungstests in CI (Linux/Windows): Dateien in < 1 s, Zusammenführen 3,1 s |
 | 6 | PDF + Excel in 8 Sprachen; Gratis-Grenzen, Organisations- und MSP-Lizenz (Logo, Ablauf); manipulierte Schlüssel abgelehnt | Berichte in 8 Sprachen (Rust-Tests, pdftotext/zipfile, Smoke-Test); Editions-/Ansichts-Tests; App-Tests Aktivieren/Neustart/Ablauf/Entfernen; jede Einzeländerung eines Schlüssels, fremde Signatur, vertauschte Signatur abgelehnt (`vbs-license`, App, Worker) |
-| 7 | Pipeline erzeugt alle Pakete; winget-Manifeste | CI windows-2025: `package.ps1` + stille Installation/Start/Deinstallation; `release.yml`; `packaging/winget/` + Generator-Selbsttest |
+| 7 | Pipeline erzeugt alle Pakete; winget-Manifeste | CI 36315645360 (windows-2025): `package.ps1` + stille Installation/Start/Deinstallation; Release-Probelauf 36315704184: alle sechs Release-Dateien; `packaging/winget/` + Generator-Selbsttest |
 
 **Offene Punkte / Abweichungen**
 - Vor dem ersten Release (die Release-Pipeline bricht sonst ab, `check-release.mjs`): Signierschlüssel erzeugen
