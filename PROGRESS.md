@@ -49,7 +49,9 @@ Docker-Schichten) und ESE-Datenbanken der Benutzerzugriffsprotokollierung. Jetzt
 Negativsammlung um solche Dateien ergänzt, der CI-Vollscan schlägt fehl, falls sie wieder als Befund auftauchen.
 Einziger Office-Befund der Runner außerhalb der Testsammlung: die gesperrte `Current.mdb` (siehe offene Punkte).
 
-**Nachweis Phase 4:** Auswertung in `vbs-evaluation`: neuester Scan je Rechner, Entdoppeln (gleiche Netzwerkdatei von
+**Nachweis Phase 4:** CI-Lauf 36303201857 (9d5e537) auf Linux, windows-2025 und windows-2022 vollständig grün (inkl.
+Merge-Leistung, Berichte in 8 Sprachen gegengelesen, App-Smoke-Test mit allen Berichten, Berichte der Runner-Vollscans).
+Auswertung in `vbs-evaluation`: neuester Scan je Rechner, Entdoppeln (gleiche Netzwerkdatei von
 mehreren Rechnern, gleicher Inhalt → Aufwand einmal), Verknüpfung Eintrag → gestartetes Skript, Risiko nach Vorgabe
 (automatisch > laut Protokoll > Office-Makro > ruhend; `breaks` vor `review`), Migrationshinweis und Faustwert je Regel
 im Katalog (`hint`, `effort` mit Basis fest/Skriptgröße/Eintrag). Windows-Bestandteile (WinSxS, Wartung, Docker-Schichten,
@@ -60,7 +62,10 @@ Abnahme: 1.000 Ergebnisdateien (210.410 Funde → 100.183 Einträge) in 3,1 s ge
 CI-Schritt Linux/Windows); Berichte in allen Sprachen vollständig – Rust-Tests und unabhängig per pdftotext/zipfile
 (`scripts/reports/check.py`, CI); jeder Aufwand als „Faustwert“ gekennzeichnet (PDF, Excel, App). Gratis-Edition in Rust
 durchgesetzt (≤ 25 Rechner bei Import und Auswertung, PDF verweigert, keine Hinweise/Aufwände in Ansichten und Excel);
-Organisationsname und MSP-Logo/Firmenname vorbereitet. Release-App: Linux-Smoke-Test inkl. Berichten grün.
+Organisationsname und MSP-Logo/Firmenname vorbereitet. Release-App: Linux-Smoke-Test inkl. Berichten grün. Vollscan
+windows-2025 als Organisation ausgewertet: 195 eigene Einträge (hoch 6, mittel 29, niedrig 160; 17 nicht prüfbar) und
+16 Windows-Bestandteile (86 Fundorte); Einstufung durchgesehen – hoch sind nur Fixtures der Testsammlung unter
+Autostart-/Anmeldeskript-Pfaden, deaktivierte Aufgaben (Server Manager `CleanupOldPerfLogs`) ruhend, keine Fehleinstufung.
 
 **Offene Punkte / Abweichungen**
 - QK4-Präzisierung: Ein nur „für die Anzeige gesperrtes“ VBA-Projekt wird gelesen (die Sperre verschlüsselt den
@@ -80,6 +85,7 @@ Organisationsname und MSP-Logo/Firmenname vorbereitet. Release-App: Linux-Smoke-
 - Phase 4: Die App läuft bis zu den Lizenzschlüsseln (Phase 5) immer als Gratis-Edition; Organisation/MSP nur in Tests
   und `examples/report.rs --edition`. Aufwandswerte sind eigene Faustwerte ohne externe Quelle (so gekennzeichnet) →
   mit Praxiswerten nachjustieren. Drittanbieter-Hinweise (Liberation Sans/OFL, Crates) für das Release zusammenstellen.
-  Berichte des Runner-Vollscans (CI-Artefakt `reports-out`) einmal fachlich durchsehen. fr/es/it/nl/pl/pt-BR maschinell
+  PDF/Excel des Runner-Vollscans (Ordner `reports-out/` im CI-Artefakt `traces-windows-2025`) einmal ansehen – die
+  Einstufung ist geprüft, Layout mit echten Daten noch nicht. fr/es/it/nl/pl/pt-BR maschinell
   unterstützt (Korrekturhinweis in der App). „Manage the Component Store“ (Microsoft Learn) vor Release gegenlesen.
 - Optional: Walk unter Windows beschleunigen (Vollscan 6–12 min); PowerShell-Dateien > 16 MB sind `tooLarge`.
